@@ -1,5 +1,76 @@
 # HANDOFF: Cautio
 
+## Phase 2: DepositVault goes real on Arbitrum Sepolia (2026-11-25)
+
+### Goal
+DEMO.md step 3 (seal, open, pick, settle on `/?lease=rua-harmonia-302`) runs as real DepositVault transactions on Arbitrum Sepolia when `NEXT_PUBLIC_CONTRACT_ADDRESS` is set and a browser wallet is present, with the receipt row linking to Arbiscan. Lease reads come from the chain through `realAdapter` behind `ADAPTER_MODE=real`. Fake reads and simulated writes stay the default.
+
+**What went real:** DepositVault reads (`leaseCount`, `leases`, `items`, `offers` via multicall) and writes (`openLease` with USDG `approve` first, `startMoveOut`, `respond`, `commitOffer`, `revealOffer`, `pickOffer`, `resolveTimeout`, `settle`) on Arbitrum Sepolia.
+
+**Still on fixtures:** human labels and notes (street, neighborhood, party names, item labels, photo notes, rent, opened and move-out dates) are overlaid from `lib/data/seed.ts` by `onchainId`; every write is simulated when no wallet or no vault address is present; the whole desk falls back to the seed when the address is missing, the RPC fails or the vault holds zero leases.
+
+**Env keys:**
+- App (all public, read only in `lib/config.ts`): `NEXT_PUBLIC_CONTRACT_ADDRESS` and `NEXT_PUBLIC_CHAIN_ID` (written by the Kontrat deploy step), `NEXT_PUBLIC_RPC_URL` (optional override), `ADAPTER_MODE` (`real` for chain reads).
+- Forge `vm.env*` names: `PRIVATE_KEY` comes from the farm wallet (`Deploy.s.sol`, `DeployWithUsdg.s.sol`, `Smoke.s.sol`); `DEPLOYED_CONTRACT` is set by the deploy step (`Smoke.s.sol`, read with `vm.envAddress`); `USDG_ADDRESS` is used only by `DeployWithUsdg.s.sol`.
+- `.farm-live.json` has an empty `requiredEnv` because reads use the keyless public Arbitrum Sepolia RPC and writes are signed by the user's own browser wallet, so the live app needs no secret.
+
+### Status
+- Slice 1 done: `lib/config.ts` (the only chain `process.env` reader), `lib/errors.ts` (`ErrorCode` union, `CoreError`, `toCoreError`), `lib/schemas.ts` (`leaseSlugSchema`), `ApiResponse` failure branch is `{ ok:false, source, error, hint }`, `[id]` route parses the slug first (400 `invalid_input`, 404 `not_found`), both routes return 502 with `toCoreError` on a throw. `zod ^3.25.0` added.
+- Slice 2 done: `sendVaultTx` real branch in `lib/vault.ts` (`createWalletClient` + `custom(window.ethereum)`, `requestAddresses`, `switchChain`, `writeContract`, `waitForTransactionReceipt` with `TX_RECEIPT_TIMEOUT_MS`), `buildVaultArgs`, `approve` before `openLease`, `[core]` log lines, failures throw `Error` with a `CoreError` cause. Simulated branch unchanged and still returns `simulated: true`. Receipt copy updated in `lease-detail.tsx` and `open-lease-panel.tsx`; `act` shows the hint.
+- Slice 3 done: `DataSource` type, `describe()` on both adapters, `lib/adapter/real.ts`, `getAdapter()` switches on `ADAPTER_MODE_ENV`, `app/page.tsx` passes `source`, `ChainLine` renders the source line above the RPC line.
+- Slice 4 done: `MockUSDG` (`owner`, `NotOwner`, `MAX_MINT` with NatSpec), seven new tests including the fuzz test, `Deploy.s.sol` reads only `PRIVATE_KEY` and always deploys MockUSDG, `DeployWithUsdg.s.sol` holds the `USDG_ADDRESS` path, `Smoke.s.sol` untouched, `test:contracts` script.
+- Slice 5 done: `scripts/proof.mjs`, `proof` script, README "On-chain proof" section with both PROOF blocks, Quickstart lines, `.farm-live.json`, `.env.example` comments.
+- Nothing was built, tested or run by the agent. `npm run build`, `forge test` and `npm run proof` are unverified until the runner and the human run them.
+
+### DepositVault security notes (quoted from `contracts/src/DepositVault.sol`, untouched)
+- Checks, effects, interactions in `openLease`: checks at lines 134 to 139 (`InvalidParty`, `InvalidAmount`, `InvalidWindow`), effects at lines 141 to 149 (`id = ++leaseCount`, lease fields, `emit LeaseOpened`), the only interaction `_pullIn(msg.sender, deposit)` last at line 151; the function is `nonReentrant` (line 131).
+- `settle` (line 304, `nonReentrant inPhase(id, Phase.Ruled)`): `l.phase = Phase.Settled` at line 308 and `emit Settled` at line 309 happen before the two `_payOut` transfers at lines 311 and 312.
+- `withdraw` (line 316, `nonReentrant`): checks at lines 318 and 319, `owed[msg.sender] = 0` at line 320 and `emit Withdrawn` at line 321 before the transfer at line 322.
+- Loop cap: `uint8 public constant MAX_ITEMS = 16;` at line 60, enforced in `addItem` at line 170 (`if (l.itemCount >= MAX_ITEMS) revert TooManyItems();`), so the only loop, in `respond` at line 196, runs at most 16 times.
+- Events for every displayed state change: lines 88 to 100 (`LeaseOpened`, `MoveOutStarted`, `ItemAdded`, `ItemsSubmitted`, `ItemsAnswered`, `OfferSealed`, `OfferRevealed`, `OfferPicked`, `TimeoutResolved`, `Ruled`, `Settled`, `PaymentHeld`, `Withdrawn`).
+
+### Decisions
+- **viem `custom(window.ethereum)` instead of wagmi.** Phase 2 adds no wallet dependency; a viem wallet client over the injected provider is enough to sign the four wow-step calls. wagmi and RainbowKit come in Phase 3 behind the same `sendVaultTx` signature.
+- **`Deploy.s.sol` is MockUSDG-only.** No official USDG exists on Arbitrum Sepolia, and `Smoke.s.sol` mints, which only works on the mock. The real-token path lives in `DeployWithUsdg.s.sol`.
+- **The `mint` cap.** `mint` stays an open faucet so any demo wallet can fund a deposit, capped at `MAX_MINT = 10_000e6` per call. The old `MINT_CAP` and `freezer` names were renamed to `MAX_MINT` and `owner`, and the `require` strings became custom errors (`MintCapExceeded`, `NotOwner`). The `Approval` event parameter was renamed from `owner` to `holder` to avoid shadowing (ABI topics unchanged).
+- Call sites no longer pass the lease id: `buildVaultArgs` prepends `BigInt(leaseId)` and converts USDG amounts with `parseUnits`. `revealOffer` now sends the real `(amount, salt)` pair instead of the old placeholder args.
+- `act` in `lease-detail.tsx` takes an optional follow-up list so "Open both offers" sends both reveals and "Claim full refund" sends `resolveTimeout` then `settle`. Same path in fake and real mode; no real-only branch in `PhaseBody`.
+- `realAdapter` memoizes one chain read for 5 seconds so `listLeases`, `describe` and `generateMetadata`'s `getLease` share it. A vault with zero leases falls back to the seed so the desk is never empty.
+- `readVaultStatus` now reports the `toCoreError` hint instead of the first line of the provider message.
+- `/api/leases/[id]` reports `source: "fake"` on a 400, because the slug is rejected before `getAdapter()` is called.
+
+### Failed attempts
+None.
+
+### Files changed
+lib/config.ts (new), lib/errors.ts (new), lib/schemas.ts (new), lib/adapter/real.ts (new), lib/adapter/index.ts, lib/adapter/fake.ts, lib/vault.ts, lib/types.ts, app/api/leases/route.ts, app/api/leases/[id]/route.ts, app/page.tsx, components/lease-desk.tsx, components/lease-detail.tsx, components/open-lease-panel.tsx, contracts/src/MockUSDG.sol, contracts/test/DepositVault.t.sol, contracts/script/Deploy.s.sol, contracts/script/DeployWithUsdg.s.sol (new), contracts/README.md, scripts/proof.mjs (new), package.json, .env.example, .farm-live.json (new), .farm-commits.json, README.md, CLAUDE.md, HANDOFF.md.
+
+### Commands run
+none, agent has no shell
+
+### Manual checklist
+- `git rm contracts/src/App.sol` (still there; the agent cannot delete files).
+- `npm install` (adds zod), `npm run build`.
+- `npm run test:contracts` must pass all 8 tests, including `testFuzz_settleConservesDeposit`.
+- Fund the farm wallet with about 0.02 Arbitrum Sepolia ETH, set `PRIVATE_KEY` in `.env.local`, press Kontrat deploy, then `npm run proof`.
+- Vercel: set `ADAPTER_MODE=real` and the two `NEXT_PUBLIC_*` values from the deploy step, redeploy, check the "Live: DepositVault" line.
+
+### Open questions
+- **The wow step needs three wallets.** DepositVault checks `msg.sender` for each side (`commitOffer`, `revealOffer`, `pickOffer`), and `openLease` forbids tenant == landlord. One browser wallet can therefore only play one role: "Open both offers" sends both reveals in sequence, and the reveal for the side the wallet does not own reverts with `NotAllowed`, which shows the error hint. Phase 3 (wallet connect plus `SeedDemo.s.sol` with derived landlord and arbiter keys) should split this into per-side buttons. Confirm that split is acceptable as layout work in Phase 3.
+- **Seed overlay versus Smoke lease.** The overlay is by `onchainId`, and `Smoke.s.sol` creates on-chain lease #1 (30 MockUSDG, demo landlord and arbiter). With `ADAPTER_MODE=real` that lease will display as "Rua Harmonia 302" with Larissa's names but 30 USDG in phase Active, until `SeedDemo.s.sol` builds the real state. Should the overlay also require matching addresses?
+- **Unrevealed offers on chain.** The chain keeps only the commit until reveal; the salt lives in the sealing browser's localStorage (`rememberSalt`). For a chain lease that is sealed but not revealed and has no seed overlay, the desk shows the seal input again (a second commit reverts with `AlreadyDone`). Phase 3 should read `cautio:salt:*` back.
+- `switchChain` fails if the wallet does not know Arbitrum Sepolia yet; there is no `addChain` fallback, and the user sees the generic hint. Add it with the Phase 3 connect flow?
+- Window lengths below one day show as fractions of a day (`windowDays` is seconds / 86,400, two decimals) for chain leases.
+
+### Next best step
+Phase 3:
+- wagmi and RainbowKit connect in the header action slot
+- `SeedDemo.s.sol` that builds the rua-harmonia-302 state on chain with derived landlord and arbiter keys
+- tx lifecycle UX (per-step pending, confirmed and error states)
+- salt backup download next to "Seal my offer"
+
+---
+
 ## Phase 1: walking skeleton (2026-11-25)
 
 ### Goal

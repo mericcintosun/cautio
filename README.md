@@ -27,7 +27,7 @@ Silence always loses. If the landlord lists nothing within the window, the whole
 
 - **Arbitrum Sepolia (421614)** hosts `DepositVault`, one Solidity contract with an explicit state machine (`Active, MoveOut, Itemized, Sealed, Revealed, Ruled, Settled`), custom errors, a reentrancy guard and checks-effects-interactions. Every waiting phase has a deadline and a `resolveTimeout()` path.
 - **Paxos USDG** is the deposit currency. Before each payout the vault calls USDG's `isFrozen()`. A frozen recipient's share is credited to `owed` and pulled later with `withdraw()`, so one frozen wallet cannot block the other side's refund. Until a USDG address on Arbitrum Sepolia is confirmed, the demo uses `MockUSDG` with the same surface; the vault takes the token address in its constructor, so switching is a redeploy, not a code change.
-- **viem** reads the chain over the public RPC from the first page load (the status line above the desk shows the live block number) and computes the exact commit hash the contract verifies.
+- **viem** reads the chain over the public RPC from the first page load (the status line above the desk shows the live block number) and computes the exact commit hash the contract verifies. With `ADAPTER_MODE=real` the desk itself is read from DepositVault. With a vault address and a browser wallet, every button on the desk signs a real DepositVault transaction and the receipt row links to Arbiscan.
 - **Web Crypto** hashes photos in the browser. The photo never leaves the device; only its hash goes on chain.
 
 | | Cautio | Rentible | RentSafe | Kleros Escrow, Trustless Work |
@@ -38,7 +38,7 @@ Silence always loses. If the landlord lists nothing within the window, the whole
 
 ## Tech stack
 
-Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS v4, shadcn-style primitives, Motion 14 for layout transitions, viem 2, Solidity 0.8.24 with Foundry, Arbitrum Sepolia, Paxos USDG (MockUSDG on testnet), Vercel.
+Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS v4, shadcn-style primitives, Motion 14 for layout transitions, viem 2, zod 3, Solidity 0.8.24 with Foundry, Arbitrum Sepolia, Paxos USDG (MockUSDG on testnet), Vercel.
 
 ## Quickstart
 
@@ -47,17 +47,41 @@ npm install
 npm run dev        # http://localhost:3000
 ```
 
-The app runs with no environment variables: it reads Arbitrum Sepolia live and shows ten seeded São Paulo leases. To point it at a deployed vault, copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_CONTRACT_ADDRESS`.
+The app runs with no environment variables: it reads Arbitrum Sepolia live and shows ten seeded São Paulo leases, and every write is simulated. To point it at a deployed vault, copy `.env.example` to `.env.local`, set `NEXT_PUBLIC_CONTRACT_ADDRESS`, and set `ADAPTER_MODE=real` to read the desk from the chain. Writes then go through your browser wallet on Arbitrum Sepolia.
 
-Contracts:
+Contracts and proof:
 
 ```bash
+npm run test:contracts   # forge test -vv in contracts/, including the fuzz test
+npm run proof            # fills the "On-chain proof" blocks below (always exits 0)
 cd contracts
-forge build
 PRIVATE_KEY=0x... forge script script/Deploy.s.sol --rpc-url https://sepolia-rollup.arbitrum.io/rpc --broadcast
 ```
 
 See `contracts/README.md` for the smoke script, verification and the full timeout table.
+
+## On-chain proof
+
+Written by `npm run proof`. Each block says plainly when it has not run.
+
+**Chain read**
+
+<!-- PROOF:BEGIN chain-read -->
+Arbitrum Sepolia (421614) block 332578139 read in 228 ms on 2026-11-25T11:02:35.653Z.
+
+Not run in this build: NEXT_PUBLIC_CONTRACT_ADDRESS is not configured.
+<!-- PROOF:END chain-read -->
+
+**Contract tests**
+
+<!-- PROOF:BEGIN forge-test -->
+```
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 75.58ms (85.70ms CPU time)
+Ran 1 test suite in 77.24ms (75.58ms CPU time): 8 tests passed, 0 failed, 0 skipped (8 total tests)
+```
+
+`forge test` in contracts/, exit code 0, 2026-11-25T11:02:36.504Z.
+<!-- PROOF:END forge-test -->
 
 ## Try the demo
 
@@ -65,8 +89,8 @@ The desk opens on Rua Harmonia 302: Larissa moved out, Otávio listed a cracked 
 
 ## What we would build next
 
-- Wallet writes through wagmi and RainbowKit, so each party signs from their own browser.
-- Foundry tests for every transition and every timeout path, plus Arbiscan verification.
+- A wallet connect button through wagmi and RainbowKit, with per-step transaction status.
+- Foundry tests for every timeout path, plus Arbiscan verification.
 - An agency pilot with one São Paulo imobiliária managing 50 live leases from one panel.
 - Pix on-ramp so a tenant can fund the deposit in reais and get USDG locked in one step.
 - Deployment on Robinhood Chain alongside Arbitrum Sepolia.
