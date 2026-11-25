@@ -65,4 +65,21 @@ Active -> MoveOut -> Itemized -> Sealed -> Revealed -> Ruled -> Settled
 `settle()` pays both sides in one transaction. A recipient that USDG reports as frozen
 (or that rejects the transfer) is credited in `owed` and pulls later with `withdraw()`.
 
+## Security notes (Phase 4)
+
+- **Measured deposit.** `_pullIn` reads `token.balanceOf(vault)` before and after the
+  `transferFrom` and reverts `TransferFailed` unless the vault received exactly the deposit.
+  A fee-on-transfer token cannot open a lease (`test_revert_feeOnTransferDepositRejected`).
+- **`Settled` carries the parties:** `Settled(id, landlord, tenant, toLandlord, toTenant)`,
+  with landlord and tenant indexed, so each side can filter its own payouts.
+- **Owner pause.** `owner` is the deployer; `setPaused(bool)` is owner-only (`NotAllowed`
+  otherwise) and emits `PausedSet`. Only `openLease` checks it (`Paused()`). Moves,
+  timeouts, `settle` and `withdraw` keep working, so a paused vault still returns every
+  locked deposit (`test_settleStillWorksWhilePaused`). There is no sweep function.
+- Open functions: `startMoveOut` (tenant or landlord), `resolveTimeout` and `settle` (anyone,
+  payouts go only to the fixed landlord and tenant), `withdraw` (pays only the caller's own
+  `owed` balance).
+- The constructor still takes one argument, the USDG token address; its order and meaning
+  did not change.
+
 `src/App.sol` is the template's placeholder contract and can be deleted.

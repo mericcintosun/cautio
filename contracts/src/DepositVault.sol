@@ -6,6 +6,7 @@ pragma solidity ^0.8.20;
 interface IUSDG {
     function transfer(address to, uint256 amount) external returns (bool);
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
     function isFrozen(address account) external view returns (bool);
 }
 
@@ -62,6 +63,9 @@ contract DepositVault {
     uint64 public constant MAX_WINDOW = 30 days;
 
     IUSDG public immutable token;
+    /// The deployer. Its only power is setPaused.
+    address public immutable owner;
+    bool public paused;
     uint256 public leaseCount;
 
     mapping(uint256 => Lease) public leases;
@@ -84,6 +88,7 @@ contract DepositVault {
     error BadReveal();
     error TransferFailed();
     error Frozen();
+    error Paused();
 
     event LeaseOpened(uint256 indexed id, address indexed tenant, address indexed landlord, address arbiter, uint256 deposit, uint64 window);
     event MoveOutStarted(uint256 indexed id, uint64 deadline);
@@ -95,9 +100,10 @@ contract DepositVault {
     event OfferPicked(uint256 indexed id, address indexed arbiter, bool tenantOffer, uint256 amount);
     event TimeoutResolved(uint256 indexed id, Phase phase);
     event Ruled(uint256 indexed id, uint256 landlordAward);
-    event Settled(uint256 indexed id, uint256 toLandlord, uint256 toTenant);
+    event Settled(uint256 indexed id, address indexed landlord, address indexed tenant, uint256 toLandlord, uint256 toTenant);
     event PaymentHeld(address indexed account, uint256 amount);
     event Withdrawn(address indexed account, uint256 amount);
+    event PausedSet(bool paused);
 
     modifier nonReentrant() {
         if (_lock != 1) revert NotAllowed();
@@ -120,6 +126,15 @@ contract DepositVault {
     constructor(IUSDG usdg) {
         if (address(usdg) == address(0)) revert InvalidParty();
         token = usdg;
+        owner = msg.sender;
+    }
+
+    /// @notice Pause stops new deposits only. It never blocks moves, timeouts, settle or withdraw,
+    /// so a paused vault still returns every locked deposit.
+    function setPaused(bool value) external {
+        if (msg.sender != owner) revert NotAllowed();
+        paused = value;
+        emit PausedSet(value);
     }
 
     // Lease lifecycle
@@ -131,6 +146,7 @@ contract DepositVault {
         nonReentrant
         returns (uint256 id)
     {
+        if (paused) revert Paused();
         if (
             landlord == address(0) || arbiter == address(0) || landlord == msg.sender || arbiter == msg.sender
                 || arbiter == landlord
@@ -152,6 +168,7 @@ contract DepositVault {
     }
 
     /// Either side announces the move-out; the landlord's itemizing clock starts.
+    /// Open to either party (tenant or landlord), checked below; no one else.
     function startMoveOut(uint256 id) external inPhase(id, Phase.Active) {
         Lease storage l = leases[id];
         if (msg.sender != l.tenant && msg.sender != l.landlord) revert NotAllowed();
@@ -301,18 +318,20 @@ contract DepositVault {
     // Payout
 
     /// One call pays the landlord's award and returns the rest to the tenant.
+    /// Anyone may call: the payout goes only to the lease's fixed landlord and tenant.
     function settle(uint256 id) external nonReentrant inPhase(id, Phase.Ruled) {
         Lease storage l = leases[id];
         uint256 toLandlord = l.landlordAward;
         uint256 toTenant = uint256(l.deposit) - toLandlord;
         l.phase = Phase.Settled;
-        emit Settled(id, toLandlord, toTenant);
+        emit Settled(id, l.landlord, l.tenant, toLandlord, toTenant);
 
         _payOut(l.landlord, toLandlord);
         _payOut(l.tenant, toTenant);
     }
 
     /// Pull a payment that was held because the recipient was frozen or rejected it.
+    /// Open to anyone, but it pays only the caller's own held balance (owed[msg.sender]).
     function withdraw() external nonReentrant {
         uint256 amount = owed[msg.sender];
         if (amount == 0) revert InvalidAmount();
@@ -339,10 +358,16 @@ contract DepositVault {
         }
     }
 
+    /// Pulls exactly `amount` from `from` (always msg.sender at the call site). The balance
+    /// is measured around the transfer, so a token that skims a fee cannot leave the vault
+    /// crediting more than it holds.
     function _pullIn(address from, uint256 amount) private {
+        uint256 beforeBal = token.balanceOf(address(this));
         (bool ok, bytes memory data) =
             address(token).call(abi.encodeCall(IUSDG.transferFrom, (from, address(this), amount)));
         if (!ok || (data.length != 0 && !abi.decode(data, (bool)))) revert TransferFailed();
+        uint256 afterBal = token.balanceOf(address(this));
+        if (afterBal < beforeBal || afterBal - beforeBal != amount) revert TransferFailed();
     }
 
     function _tryTransfer(address to, uint256 amount) private returns (bool) {

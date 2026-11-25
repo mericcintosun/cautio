@@ -16,6 +16,40 @@ interface Vm {
     function expectEmit(bool checkTopic1, bool checkTopic2, bool checkTopic3, bool checkData, address emitter) external;
 }
 
+/// A fee-on-transfer token: transferFrom delivers 99 percent and burns 1 percent.
+/// Used only to prove DepositVault measures what it actually receives.
+contract FeeToken {
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function approve(address spender, uint256 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        return true;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        allowance[from][msg.sender] -= amount;
+        uint256 fee = amount / 100;
+        balanceOf[from] -= amount;
+        balanceOf[to] += amount - fee;
+        return true;
+    }
+
+    function isFrozen(address) external pure returns (bool) {
+        return false;
+    }
+}
+
 /// Walks DEMO.md steps 2 and 3 on chain: Rua Harmonia 302, window 400 accepted,
 /// paint 900 disputed, sealed offers 900 (landlord) and 300 (tenant), the arbiter
 /// picks the tenant's 300, settle pays 700 to the landlord and 2,300 to the tenant.
@@ -43,7 +77,7 @@ contract DepositVaultTest {
     MockUSDG usdg;
     DepositVault vault;
 
-    event Settled(uint256 indexed id, uint256 toLandlord, uint256 toTenant);
+    event Settled(uint256 indexed id, address indexed landlord, address indexed tenant, uint256 toLandlord, uint256 toTenant);
 
     function setUp() public {
         vm.warp(1_764_072_000); // 25 Nov 2025 12:00 UTC, any fixed instant works
@@ -145,8 +179,60 @@ contract DepositVaultTest {
         vault.pickOffer(id, true);
 
         vm.expectEmit(true, true, true, true, address(vault));
-        emit Settled(id, 700e6, 2_300e6);
+        emit Settled(id, LANDLORD, TENANT, 700e6, 2_300e6);
         vault.settle(id);
+    }
+
+    // Security pass (Phase 4)
+
+    /// A token that skims 1 percent on transferFrom must not open a lease: the vault
+    /// measures its balance around the pull and reverts on any shortfall.
+    function test_revert_feeOnTransferDepositRejected() public {
+        FeeToken fee = new FeeToken();
+        DepositVault feeVault = new DepositVault(IUSDG(address(fee)));
+        fee.mint(TENANT, DEPOSIT);
+
+        vm.startPrank(TENANT);
+        fee.approve(address(feeVault), DEPOSIT);
+        vm.expectRevert(DepositVault.TransferFailed.selector);
+        feeVault.openLease(LANDLORD, ARBITER, DEPOSIT, WINDOW);
+        vm.stopPrank();
+
+        require(fee.balanceOf(TENANT) == DEPOSIT, "tenant keeps the deposit");
+        require(feeVault.leaseCount() == 0, "no lease opened");
+    }
+
+    function test_revert_openLeaseWhenPaused() public {
+        // This test contract deployed the vault, so it is the owner.
+        vault.setPaused(true);
+
+        vm.startPrank(TENANT);
+        usdg.mint(TENANT, DEPOSIT);
+        usdg.approve(address(vault), DEPOSIT);
+        vm.expectRevert(DepositVault.Paused.selector);
+        vault.openLease(LANDLORD, ARBITER, DEPOSIT, WINDOW);
+        vm.stopPrank();
+    }
+
+    function test_revert_setPausedByStranger() public {
+        vm.expectRevert(DepositVault.NotAllowed.selector);
+        vm.prank(STRANGER);
+        vault.setPaused(true);
+    }
+
+    /// Pause stops new deposits only: a lease already locked still settles in full.
+    function test_settleStillWorksWhilePaused() public {
+        uint256 id = _toRevealed();
+        vm.prank(ARBITER);
+        vault.pickOffer(id, true);
+
+        vault.setPaused(true);
+        require(vault.paused(), "vault paused");
+        vault.settle(id);
+
+        require(usdg.balanceOf(LANDLORD) == 700e6, "landlord gets 700 while paused");
+        require(usdg.balanceOf(TENANT) == 2_300e6, "tenant gets 2,300 while paused");
+        require(usdg.balanceOf(address(vault)) == 0, "vault emptied");
     }
 
     // Reverts

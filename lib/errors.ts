@@ -29,6 +29,7 @@ const REVERT_HINTS: Record<string, string> = {
   InvalidWindow: "The window must be between 60 seconds and 30 days.",
   TooManyItems: "A lease holds at most 16 deduction items.",
   TransferFailed: "The USDG transfer did not go through. Check the balance and allowance.",
+  Paused: "New deposits are paused on this vault. Existing leases still settle.",
 };
 
 /** Walks err, err.cause, err.cause.cause and so on (viem nests its errors). */
