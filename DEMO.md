@@ -22,6 +22,8 @@
    File: `app/about/page.tsx`.
 5. **`/?lease=alameda-santos-1140`: the silent landlord.** Helena Vasconcelos never listed a deduction and the 30 day window closed on 18 Nov. Click "Claim full refund of 3,600 USDG"; Rafael Okamoto gets the full deposit back.
    File: `app/page.tsx` plus `components/lease-detail.tsx`.
+6. **`/?lease=<the step 1 lease>`: the landlord lists live.** From the step 1 receipt, "List deductions on this lease" opens the new lease; either party presses "Start move-out", then Otávio's wallet adds "Cracked bedroom window pane" for 400 and "Repaint living room walls" for 900, each with a move-in and a move-out photo hashed in the browser, and sends the list with `submitItems`. After "Refresh from chain" the two lines render from DepositVault reads as 400 and 900 USDG with their hash pairs, 1,300 USDG claimed of 3,000.
+   File: `components/lease-detail.tsx` (`ListingForm`) plus `components/open-lease-panel.tsx`.
 
 ## Verbs and contract events
 

@@ -7,6 +7,7 @@ import {
   keccak256,
   parseAbi,
   parseAbiParameters,
+  parseEventLogs,
   parseUnits,
   stringToHex,
   toHex,
@@ -52,7 +53,8 @@ export const depositVaultAbi = parseAbi([
   "function resolveTimeout(uint256 id)",
   "function settle(uint256 id)",
   "function withdraw()",
-  // Custom errors, copied from DepositVault.sol lines 75 to 86, so viem can decode reverts.
+  "event LeaseOpened(uint256 indexed id, address indexed tenant, address indexed landlord, address arbiter, uint256 deposit, uint64 window)",
+  // Custom errors, copied from DepositVault.sol, so viem can decode reverts.
   "error InvalidParty()",
   "error InvalidAmount()",
   "error InvalidWindow()",
@@ -65,6 +67,7 @@ export const depositVaultAbi = parseAbi([
   "error BadReveal()",
   "error TransferFailed()",
   "error Frozen()",
+  "error Paused()",
 ]);
 
 const erc20ApproveAbi = parseAbi(["function approve(address,uint256) returns (bool)"]);
@@ -155,6 +158,8 @@ export async function sha256Hex(file: Blob): Promise<Hex> {
 export type VaultWrite =
   | "openLease"
   | "startMoveOut"
+  | "addItem"
+  | "submitItems"
   | "respond"
   | "commitOffer"
   | "revealOffer"
@@ -165,6 +170,8 @@ export type VaultWrite =
 export interface VaultTx {
   hash: Hex;
   simulated: boolean;
+  /** For a real openLease: the new on-chain lease id, read from the LeaseOpened log of the receipt. */
+  leaseId?: number;
 }
 
 const usdg = (n: unknown): bigint => parseUnits(String(n), USDG_DECIMALS);
@@ -173,17 +180,20 @@ const usdg = (n: unknown): bigint => parseUnits(String(n), USDG_DECIMALS);
  * The single place where UI values become contract arguments.
  * Callers pass plain numbers for USDG amounts and leave the lease id out:
  *   openLease    [landlord, arbiter, depositUsdg, windowSeconds]
+ *   addItem      [amountUsdg, entryHash, exitHash]
  *   respond      [disputeMask]
  *   commitOffer  [commit]
  *   revealOffer  [amountUsdg, salt]
  *   pickOffer    [tenantOffer]
- *   startMoveOut, resolveTimeout, settle: []
+ *   startMoveOut, submitItems, resolveTimeout, settle: []
  * Every fn except openLease gets BigInt(leaseId) prepended.
  */
 export function buildVaultArgs(fn: VaultWrite, leaseId: number, args: readonly unknown[]): readonly unknown[] {
   switch (fn) {
     case "openLease":
       return [args[0], args[1], usdg(args[2]), BigInt(String(args[3]))];
+    case "addItem":
+      return [BigInt(leaseId), usdg(args[0]), args[1], args[2]];
     case "revealOffer":
       return [BigInt(leaseId), usdg(args[0]), args[1]];
     case "respond":
@@ -324,7 +334,43 @@ async function realVaultTx(fn: VaultWrite, leaseId: number, args: readonly unkno
   const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: TX_RECEIPT_TIMEOUT_MS });
   console.info(`${LOG_PREFIX} tx confirmed fn=${fn} block=${receipt.blockNumber}`);
   if (receipt.status !== "success") throw new Error(`${fn} reverted`);
+  if (fn === "openLease") {
+    const [opened] = parseEventLogs({ abi: depositVaultAbi, eventName: "LeaseOpened", logs: receipt.logs });
+    if (opened) return { hash, simulated: false, leaseId: Number(opened.args.id) };
+  }
   return { hash, simulated: false };
+}
+
+const fmt = (n: number | undefined): string => `${(n ?? 0).toLocaleString("en-US")} USDG`;
+
+/**
+ * One plain sentence per write, shown above its send button before the wallet opens,
+ * so the amount in the popup is the amount the page already said.
+ */
+export function describeTx(fn: VaultWrite, ctx: { deposit?: number; amount?: number; street: string }): string {
+  const { deposit, amount, street } = ctx;
+  switch (fn) {
+    case "openLease":
+      return `Approve exactly ${fmt(deposit)} for DepositVault, then lock it for ${street}.`;
+    case "startMoveOut":
+      return `Start the move-out on ${street}. The landlord's listing window opens; no money moves.`;
+    case "addItem":
+      return `Record one deduction of ${fmt(amount)} with two photo hashes on ${street}. No money moves.`;
+    case "submitItems":
+      return `Send the list of ${fmt(amount)} in deductions on ${street} to the tenant. No money moves.`;
+    case "respond":
+      return `Accept ${fmt(amount)} and dispute the rest of the list on ${street}. No money moves.`;
+    case "commitOffer":
+      return `Seal a hash of your final number on ${street}. The number itself stays in this browser.`;
+    case "revealOffer":
+      return `Open your sealed offer of ${fmt(amount)} on ${street} so the arbiter can see it.`;
+    case "pickOffer":
+      return `Pick the offer of ${fmt(amount)} on ${street}. This fixes the landlord's award.`;
+    case "resolveTimeout":
+      return `Close the timed-out step on ${street}, then pay ${fmt(deposit)} back to the tenant from DepositVault.`;
+    case "settle":
+      return `Pay ${fmt(amount)} to the landlord and ${fmt((deposit ?? 0) - (amount ?? 0))} to the tenant from DepositVault.`;
+  }
 }
 
 /**

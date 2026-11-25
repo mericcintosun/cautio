@@ -55,6 +55,12 @@ export interface DemoAnchor {
   seedId: string;
   /** True for the lease rows SeedDemo.s.sol opens for this seed lease. Fields never change over the flow. */
   match: (row: LeaseRow) => boolean;
+  /**
+   * SeedDemo.s.sol opens this anchor right before the named one, in the same broadcast, so
+   * its id is exactly one below. Pinning it this way keeps a live lease with the same numbers
+   * (DEMO step 6 lists 400 and 900 on the step 1 lease) from taking over the anchor.
+   */
+  idBefore?: string;
 }
 
 /** Keep in step with contracts/script/SeedDemo.s.sol and the demo-state block in scripts/proof.mjs. */
@@ -62,6 +68,7 @@ export const DEMO_ANCHORS: readonly DemoAnchor[] = [
   {
     seedId: "rua-harmonia-302",
     match: (r) => r[3] === 3_000_000_000n && r[11] === 2 && r[4] === 1_300_000_000n,
+    idBefore: "alameda-santos-1140",
   },
   {
     seedId: "alameda-santos-1140",
@@ -87,7 +94,8 @@ function toLease(id: number, row: LeaseRow, itemRows: ItemRow[], tenantOffer: Of
     const answer: Answer = answered ? (disputed ? "disputed" : "accepted") : "pending";
     return {
       id: seedItem?.id ?? `item-${i + 1}`,
-      label: seedItem?.label ?? `Item ${i + 1}`,
+      // The chain stores no labels: a line listed live reads back as "Line N".
+      label: seedItem?.label ?? `Line ${i + 1}`,
       amount: usdg(amount),
       entryNote: seedItem?.entryNote ?? "Move-in photo hash anchored on chain",
       exitNote: seedItem?.exitNote ?? "Move-out photo hash anchored on chain",
@@ -144,9 +152,26 @@ function toLease(id: number, row: LeaseRow, itemRows: ItemRow[], tenantOffer: Of
  */
 export function resolveAnchors(ids: number[], rows: LeaseRow[]): Map<string, number> {
   const found = new Map<string, number>();
-  for (const anchor of DEMO_ANCHORS) {
+  const newestMatch = (anchor: DemoAnchor): number | undefined => {
     const k = ids.findIndex((_, i) => anchor.match(rows[i]));
-    if (k !== -1) found.set(anchor.seedId, ids[k]);
+    return k === -1 ? undefined : ids[k];
+  };
+  // Free anchors first, then the ones pinned one id below another anchor.
+  for (const anchor of DEMO_ANCHORS) {
+    if (anchor.idBefore) continue;
+    const id = newestMatch(anchor);
+    if (id !== undefined) found.set(anchor.seedId, id);
+  }
+  for (const anchor of DEMO_ANCHORS) {
+    if (!anchor.idBefore) continue;
+    const next = found.get(anchor.idBefore);
+    if (next === undefined) {
+      const id = newestMatch(anchor);
+      if (id !== undefined) found.set(anchor.seedId, id);
+      continue;
+    }
+    const k = ids.indexOf(next - 1);
+    if (k !== -1 && anchor.match(rows[k])) found.set(anchor.seedId, next - 1);
   }
   return found;
 }

@@ -6,6 +6,8 @@ import type { Hex } from "viem";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NavLink } from "@/components/ui/nav-link";
+import { TxIntent } from "@/components/tx-intent";
 import { formatUsdg, seedParty, type Lease, type OpenLeaseInput, type Party } from "@/lib/data";
 import { EXPLORER } from "@/lib/config";
 import { sendVaultTx, sha256Hex, type VaultTx } from "@/lib/vault";
@@ -141,7 +143,7 @@ export function OpenLeasePanel({ template }: { template: Lease | null }) {
                         className="underline decoration-primary decoration-2"
                         href={`${EXPLORER}/tx/${state.tx.hash}`}
                         target="_blank"
-                        rel="noreferrer"
+                        rel="noopener noreferrer"
                       >
                         {state.tx.hash} on Arbiscan
                       </a>
@@ -154,9 +156,22 @@ export function OpenLeasePanel({ template }: { template: Lease | null }) {
           <p className="text-sm text-muted-foreground">
             {state.input.tenant.name}&apos;s deposit is now held by the vault. Neither {state.input.landlord.name} nor{" "}
             {state.input.tenant.name} can move it alone.
-            {state.tx.simulated && " Simulated: no vault address or browser wallet."}
+            {state.tx.simulated && " Simulated: no vault address or browser wallet, so there is no lease on chain to list deductions on."}
           </p>
+          {!state.tx.simulated &&
+            (state.tx.leaseId ? (
+              <p className="text-sm">
+                Next (demo step 6): {state.input.landlord.name} lists the deductions on this lease from the landlord wallet.
+              </p>
+            ) : (
+              <p className="text-sm">Refresh from chain, then open the newest Lease #N on the desk.</p>
+            ))}
           <div className="flex flex-wrap gap-3">
+            {!state.tx.simulated && (
+              <Button asChild variant="secondary">
+                <NavLink href={state.tx.leaseId ? `/?lease=lease-${state.tx.leaseId}` : "/"}>List deductions on this lease</NavLink>
+              </Button>
+            )}
             <Button asChild>
               <Link href="/">Back to the desk</Link>
             </Button>
@@ -217,6 +232,7 @@ export function OpenLeasePanel({ template }: { template: Lease | null }) {
             </p>
           )}
 
+          <TxIntent fn="openLease" street={template?.street ?? "this lease"} deposit={deposit} origin="chain" />
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" disabled={sending}>
               {sending ? "Locking…" : `Lock ${formatUsdg(deposit)}`}
