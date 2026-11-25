@@ -359,7 +359,9 @@ export function describeTx(fn: VaultWrite, ctx: { deposit?: number; amount?: num
     case "submitItems":
       return `Send the list of ${fmt(amount)} in deductions on ${street} to the tenant. No money moves.`;
     case "respond":
-      return `Accept ${fmt(amount)} and dispute the rest of the list on ${street}. No money moves.`;
+      return (amount ?? 0) > 0
+        ? `Accept ${fmt(amount)} and dispute the rest of the list on ${street}. No money moves.`
+        : `Dispute every deduction on ${street}. No money moves.`;
     case "commitOffer":
       return `Seal a hash of your final number on ${street}. The number itself stays in this browser.`;
     case "revealOffer":
