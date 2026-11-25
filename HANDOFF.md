@@ -1,5 +1,70 @@
 # HANDOFF: Cautio
 
+## Phase 3: the whole demo path on chain, one wallet per role (2026-11-25)
+
+### Goal
+DEMO.md steps 1, 2, 3 and 5 run as real DepositVault transactions on Arbitrum Sepolia from three browser profiles (tenant Larissa, landlord Otávio, arbiter Camila), starting from an on-chain state that `npm run demo:reset` rebuilds. Each wallet acts only in its own role. Seed reads and simulated writes stay the fallback.
+
+### Status
+- Slice 1 done: `lib/wallet-state.ts` (`WalletState` with the eight kinds, `Role`, `roleOf`, `accountOf`), `lib/errors.ts` (`user_rejected`, `wrong_network`, cause-chain walk, one sentence per vault custom error, `isCoreError`), `lib/vault.ts` (error ABI, `assertNotInFlight`, `switchToVaultChain` with the 4902 `addChain` retry, `origin` fourth argument, `simulateContract` dry run before each write except `openLease`, `recallSalt`), `components/wallet-provider.tsx`, `components/wallet-button.tsx`, `app/layout.tsx`, IDENTITY Amendments line.
+- Slice 2 done: `Lease.origin`, `SeedOffer.commit` and `revealed`, `DEMO_ANCHORS` plus `resolveAnchors` in `lib/adapter/real.ts` (newest 24 ids, 5 second memo kept), `leaseSignature` re-derive and "Refresh from chain" in `lease-desk.tsx`, role gating, "Open my offer", salt read-back and "Download salt backup" in `lease-detail.tsx`, `components/tx-status.tsx` replacing the receipt row.
+- Slice 3 done: `contracts/script/SeedDemo.s.sol`, `scripts/demo-reset.mjs`, `demo:reset` and `demo:seed-chain` scripts, `.env.example` keys, proof `demo-state` block plus README markers, README "Demo reset" section and the line 92 rewrite.
+- Slice 4 done: `components/desk-states.tsx` (`DeskSkeleton`, `AboutSkeleton`, `DeskErrorState`, `DeskEmptyState`, `VaultEmptyState`), `app/loading.tsx`, `app/error.tsx`, `app/about/loading.tsx`, `/about` empty state, `scene-slot.tsx` on `next/image` with `unoptimized`.
+- Nothing was built, tested or run by the agent. `npm run build`, `forge build`, `npm run demo:reset` and `npm run proof` are unverified.
+
+### Decisions
+- **No wagmi, no RainbowKit, no react-query.** RainbowKit needs a WalletConnect project id the farm does not hold, and its modal breaks the sharp riso look. A small context (`WalletProvider`) over viem and `window.ethereum` covers connect, network switch, account and chain listeners and the tx lifecycle. No new npm dependency.
+- **Wallet states carry the account** on `wrong-network` and every `tx-*` kind (not only `idle`), so role gating does not flicker while a transaction is pending.
+- **`send` never throws.** It returns the tx or null; `tx-confirmed` is set only after `sendVaultTx` returns, which is after the receipt.
+- **Anchor fingerprints** (`DEMO_ANCHORS`, raw `LeaseRow`): `rua-harmonia-302` = deposit `3000e6`, itemCount `2`, claimedTotal `1300e6`; `alameda-santos-1140` = deposit `3600e6`, itemCount `0`, window `60`. None of these fields change during the flow, so the anchor stays recognized through settle. The newest matching id wins. Chain leases without an anchor show as "Lease #N" only above the newest anchor id (for example the step 1 lease); older ones (Smoke lease #1, earlier cycles) are hidden. The other eight seed leases render with `onchainId: 0` and `origin: "seed"`, so their writes stay simulated. The same fingerprints are duplicated in `scripts/proof.mjs` (it cannot import TS).
+- **Chain store row.** The decision-table row is "the step's proof IS the chain": DepositVault plus `lib/config.ts`, no store. Rejected: KV (nothing to cache that the chain does not already hold, and a second source of truth for phase) and Postgres (same, plus a schema push and a secret the live app does not need). Schema-push commands: not applicable. The salt in localStorage (`cautio:salt:*`, plus `cautio:amount:*` for the amount) is per-user browser state, not a store.
+- **Append-only reset.** The chain cannot be rewound, so `demo:reset` opens two fresh anchors each run and the newest-anchor rule makes older ones invisible. Every cycle shows the same desk. Salts are keyed `chain-<onchainId>` for chain leases, so a new cycle never reads an old salt.
+- **Both anchors use the same three wallets.** Alameda Santos shows the seed names Rafael and Helena, but on chain its tenant, landlord and arbiter are the Larissa, Otávio and Camila wallets. Step 5 ("Claim full refund") is open to anyone, so any profile can run it.
+- **Chain deadlines use the real clock**; seed leases still use `SEED_NOW`. A chain lease in MoveOut shows "Check the window again" instead of "run the clock out", because `resolveTimeout` reverts before the deadline.
+- **Step 1 on a chain desk** keeps the template's addresses when the names match, so the new lease names the real Otávio and Camila wallets instead of derived seed addresses. `openLease` passes `origin: "chain"`.
+- **Dry run before each write.** `simulateContract` decodes reverts (`NotAllowed`, `WrongPhase`...) before the wallet prompt, so a wrong role sees one sentence and spends no gas.
+- **Kit #1 untouched.** The `layoutId` cell to detail transition in `lease-desk.tsx` is unchanged.
+- **`brand-mark.tsx` keeps its own image markup**; it is the one exception to the `next/image` switch because it is on the never-touch list.
+- On-chain guards that back the client-side idempotency (quoted from `DepositVault.sol`, untouched): `modifier inPhase(uint256 id, Phase expected)` (line 109) on every step, `if (o.commit != bytes32(0)) revert AlreadyDone();` (line 226) and `if (o.revealed) revert AlreadyDone();` (line 245).
+
+### Demo path, real and fallback
+- Step 1: `components/open-lease-panel.tsx` calls `sendVaultTx("openLease", 0, [...], "chain")`; the simulated branch is in `lib/vault.ts` (`sendVaultTx`, no vault address or no wallet).
+- Steps 2, 3 and 5: `components/lease-detail.tsx` (role-gated `act` through `useWallet().send`) on leases read by `lib/adapter/real.ts`; the seed fallback is in `real.ts` (`realAdapter` returns `seedLeases` when the read fails, and non-anchor seed leases carry `origin: "seed"`).
+- Step 4: `/about`, static.
+
+### Failed attempts
+None.
+
+### Files changed
+lib/wallet-state.ts (new), lib/errors.ts, lib/vault.ts, lib/types.ts, lib/adapter/real.ts, components/wallet-provider.tsx (new), components/wallet-button.tsx (new), components/tx-status.tsx (new), components/desk-states.tsx (new), components/lease-desk.tsx, components/lease-detail.tsx, components/open-lease-panel.tsx, components/scene-slot.tsx, app/layout.tsx, app/loading.tsx, app/error.tsx, app/about/page.tsx, app/about/loading.tsx (new), contracts/script/SeedDemo.s.sol (new), scripts/demo-reset.mjs (new), scripts/proof.mjs, package.json, .env.example, README.md, IDENTITY.md (Amendments only), HANDOFF.md, .farm-commits.json.
+
+### Commands run
+none, agent has no shell
+
+### Manual checklist
+- Before the run: generate three keys with `cast wallet new`, put `DEMO_TENANT_KEY`, `DEMO_LANDLORD_KEY` and `DEMO_ARBITER_KEY` in `.env.local`, import each into its own browser profile. The farm wallet needs at least 0.01 Arbitrum Sepolia ETH extra (https://arbitrum.faucet.dev/, https://sepoliafaucet.com/, https://ethfaucet.com/networks/arbitrum).
+- `npm run build` with zero TypeScript errors.
+- `cd contracts && forge build` (SeedDemo.s.sol has not been compiled by the agent).
+- `npm run proof` fills the `demo-state` block.
+- `npm run demo:reset`, then walk DEMO.md three cycles in a row: identical screens, no step over 5 seconds.
+- On the live URL in a private window: connect, the wrong-network switch, one confirmed tx linking to Arbiscan, one rejected tx showing "You closed the wallet. Nothing was sent."
+- Re-run the tripwire greps (hexes, keyframes, `--delay`, `backdrop-blur`, one `<BrandMark` in `app/layout.tsx`).
+- `git rm contracts/src/App.sol` if still present.
+
+### Open questions
+- **No live push between windows.** Realtime was out of scope, so after the other window signs, press "Refresh from chain". The wow moment therefore needs one refresh click in each window after the second reveal. Polling every few seconds would remove it; confirm before adding.
+- **Memo after a tx.** The 5 second read memo can serve a pre-tx read if a refresh lands within 5 seconds of an earlier read. The flow does not regress (an unchanged signature keeps the local flow), but the desk may need a second refresh. Lowering `MEMO_MS` after writes would need a cache tag or a request flag.
+- **Clock-based `clockRunOut` on chain leases** is computed during render with `Date.now()`, so a server and client render straddling the 60 second deadline can mismatch once. Rare; a client-only effect would fix it.
+- **No salt import.** "Download salt backup" writes the file, but there is no upload to read it back in another browser. Reveal works from the sealing browser's localStorage.
+- **Landlord listing UI.** `addItem` and `submitItems` have no form; SeedDemo does them. DEMO step 2 starts with the list already on chain, which matches the script, but a live listing step would need a landlord form.
+- **The Alameda names** (Rafael, Helena) sit on the same three wallets as Rua Harmonia. Separate role keys for the second lease would mean three more keys; confirm whether that matters for the video.
+- **`demo:seed-chain`** is written exactly as specified (`forge script ... --broadcast` without `--rpc-url`), so it needs `ETH_RPC_URL` or an `rpc_endpoints` entry; `demo:reset` passes the RPC explicitly.
+
+### Next best step
+Phase 4: kit signatures #2 (draggable offer marker on the 0 to disputed-total rail, bound to the sealed amount) and #3 (`AnimatePresence` staging of pending, result and error), a landlord listing form, optional short polling of the selected chain lease, then the Robinhood Chain deploy and the 90 second recording.
+
+---
+
 ## Phase 2: DepositVault goes real on Arbitrum Sepolia (2026-11-25)
 
 ### Goal

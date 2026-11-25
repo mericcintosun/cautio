@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { VaultEmptyState } from "@/components/desk-states";
 import { SceneSlot } from "@/components/scene-slot";
+import { VAULT_ADDRESS } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DEFAULT_LEASE_ID } from "@/lib/data";
@@ -56,6 +58,8 @@ export default function AboutPage() {
           className="border-2 border-border"
         />
       </header>
+
+      {VAULT_ADDRESS === null && <VaultEmptyState />}
 
       <section className="space-y-6">
         <h2 className="text-4xl">The move-out problem</h2>
