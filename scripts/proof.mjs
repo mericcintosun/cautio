@@ -1,8 +1,9 @@
 // npm run proof
-// Writes two proof blocks into README.md:
+// Writes three proof blocks into README.md:
 //   chain-read: Arbitrum Sepolia block number and latency, plus leaseCount() and token()
 //               when NEXT_PUBLIC_CONTRACT_ADDRESS is set
 //   forge-test: the Suite result and passed lines of `forge test` in contracts/
+//   demo-state: id, phase and deposit of the two demo anchor leases (newest fingerprint match)
 // Never throws for a missing key, always exits 0, writes only README.md.
 
 import { spawnSync } from "node:child_process";
@@ -77,6 +78,59 @@ async function chainRead(env) {
   }
 }
 
+// Same fingerprints as DEMO_ANCHORS in lib/adapter/real.ts (this script cannot import TS).
+// Row indices: 3 deposit, 4 claimedTotal, 8 window, 10 phase, 11 itemCount.
+const DEMO_ANCHORS = [
+  { seedId: "rua-harmonia-302", match: (r) => r[3] === 3_000_000_000n && Number(r[11]) === 2 && r[4] === 1_300_000_000n },
+  { seedId: "alameda-santos-1140", match: (r) => r[3] === 3_600_000_000n && Number(r[11]) === 0 && r[8] === 60n },
+];
+const PHASES = ["None", "Active", "MoveOut", "Itemized", "Sealed", "Revealed", "Ruled", "Settled"];
+const NEWEST_LEASES = 24;
+
+async function demoState(env) {
+  const address = env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "";
+  const vault = isAddress(address) ? address : null;
+  if (!vault) {
+    return { summary: "demo-state: no vault address", body: "Not run in this build: NEXT_PUBLIC_CONTRACT_ADDRESS is not configured." };
+  }
+  const missing = ["DEMO_TENANT_KEY", "DEMO_LANDLORD_KEY", "DEMO_ARBITER_KEY"].filter((k) => !env[k]);
+  const client = createPublicClient({
+    chain: arbitrumSepolia,
+    transport: http(env.NEXT_PUBLIC_RPC_URL || "https://sepolia-rollup.arbitrum.io/rpc", {
+      timeout: RPC_TIMEOUT_MS,
+      retryCount: RPC_RETRY_COUNT,
+    }),
+  });
+  const abi = parseAbi([
+    "function leaseCount() view returns (uint256)",
+    "function leases(uint256) view returns (address tenant, address landlord, address arbiter, uint128 deposit, uint128 claimedTotal, uint128 acceptedTotal, uint128 disputedTotal, uint128 landlordAward, uint64 window, uint64 deadline, uint8 phase, uint8 itemCount)",
+  ]);
+  const when = new Date().toISOString();
+  try {
+    const count = Number(await client.readContract({ address: vault, abi, functionName: "leaseCount" }));
+    const ids = Array.from({ length: Math.min(count, NEWEST_LEASES) }, (_, i) => count - i);
+    const rows = await Promise.all(ids.map((id) => client.readContract({ address: vault, abi, functionName: "leases", args: [BigInt(id)] })));
+    const lines = [];
+    for (const anchor of DEMO_ANCHORS) {
+      const k = ids.findIndex((_, i) => anchor.match(rows[i]));
+      if (k === -1) {
+        lines.push(`- \`${anchor.seedId}\`: Not run in this build: no matching lease in the newest ${NEWEST_LEASES} (run \`npm run demo:reset\`).`);
+        continue;
+      }
+      const r = rows[k];
+      lines.push(`- \`${anchor.seedId}\`: lease #${ids[k]}, phase ${PHASES[Number(r[10])] ?? r[10]}, deposit ${Number(r[3]) / 1e6} USDG`);
+    }
+    lines.push("", `Read from DepositVault \`leaseCount()\` = ${count} on ${when}.`);
+    if (missing.length > 0) lines.push(`Role keys not set here (${missing.join(", ")}), so this run did not reseed.`);
+    return { summary: `demo-state: ${lines.filter((l) => l.startsWith("- ") && l.includes("lease #")).length} of 2 anchors found`, body: lines.join("\n") };
+  } catch {
+    return {
+      summary: "demo-state: RPC did not answer",
+      body: `Not run in this build: the Arbitrum Sepolia RPC did not answer within ${RPC_TIMEOUT_MS} ms (one retry) on ${when}.`,
+    };
+  }
+}
+
 function forgeTest() {
   const res = spawnSync("forge", ["test"], {
     cwd: join(ROOT, "contracts"),
@@ -124,6 +178,8 @@ async function main() {
   console.log(chain.summary);
   const forge = forgeTest();
   console.log(forge.summary);
+  const demo = await demoState(env);
+  console.log(demo.summary);
 
   if (!existsSync(README)) {
     console.log("proof: README.md not found, nothing written");
@@ -132,6 +188,7 @@ async function main() {
   let text = readFileSync(README, "utf8");
   text = writeBlock(text, "chain-read", chain.body);
   text = writeBlock(text, "forge-test", forge.body);
+  text = writeBlock(text, "demo-state", demo.body);
   writeFileSync(README, text);
 }
 

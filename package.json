@@ -8,7 +8,9 @@
     "start": "next start",
     "seed": "tsx scripts/seed.ts",
     "proof": "node scripts/proof.mjs",
-    "test:contracts": "cd contracts && forge test -vv"
+    "test:contracts": "cd contracts && forge test -vv",
+    "demo:seed-chain": "cd contracts && forge script script/SeedDemo.s.sol --broadcast",
+    "demo:reset": "node scripts/demo-reset.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.1.2",

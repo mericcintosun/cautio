@@ -27,7 +27,7 @@ Silence always loses. If the landlord lists nothing within the window, the whole
 
 - **Arbitrum Sepolia (421614)** hosts `DepositVault`, one Solidity contract with an explicit state machine (`Active, MoveOut, Itemized, Sealed, Revealed, Ruled, Settled`), custom errors, a reentrancy guard and checks-effects-interactions. Every waiting phase has a deadline and a `resolveTimeout()` path.
 - **Paxos USDG** is the deposit currency. Before each payout the vault calls USDG's `isFrozen()`. A frozen recipient's share is credited to `owed` and pulled later with `withdraw()`, so one frozen wallet cannot block the other side's refund. Until a USDG address on Arbitrum Sepolia is confirmed, the demo uses `MockUSDG` with the same surface; the vault takes the token address in its constructor, so switching is a redeploy, not a code change.
-- **viem** reads the chain over the public RPC from the first page load (the status line above the desk shows the live block number) and computes the exact commit hash the contract verifies. With `ADAPTER_MODE=real` the desk itself is read from DepositVault. With a vault address and a browser wallet, every button on the desk signs a real DepositVault transaction and the receipt row links to Arbiscan.
+- **viem** reads the chain over the public RPC from the first page load (the status line above the desk shows the live block number) and computes the exact commit hash the contract verifies. With `ADAPTER_MODE=real` the desk itself is read from DepositVault. With a vault address and a browser wallet, the two demo anchor leases sign real DepositVault transactions, each wallet only for its own role (tenant, landlord or arbiter), and the receipt row links to Arbiscan. The other sample leases stay simulated.
 - **Web Crypto** hashes photos in the browser. The photo never leaves the device; only its hash goes on chain.
 
 | | Cautio | Rentible | RentSafe | Kleros Escrow, Trustless Work |
@@ -67,7 +67,7 @@ Written by `npm run proof`. Each block says plainly when it has not run.
 **Chain read**
 
 <!-- PROOF:BEGIN chain-read -->
-Arbitrum Sepolia (421614) block 332578139 read in 228 ms on 2026-11-25T11:02:35.653Z.
+Arbitrum Sepolia (421614) block 332581368 read in 523 ms on 2026-11-25T11:17:42.873Z.
 
 Not run in this build: NEXT_PUBLIC_CONTRACT_ADDRESS is not configured.
 <!-- PROOF:END chain-read -->
@@ -76,12 +76,31 @@ Not run in this build: NEXT_PUBLIC_CONTRACT_ADDRESS is not configured.
 
 <!-- PROOF:BEGIN forge-test -->
 ```
-Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 75.58ms (85.70ms CPU time)
-Ran 1 test suite in 77.24ms (75.58ms CPU time): 8 tests passed, 0 failed, 0 skipped (8 total tests)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 106.16ms (107.47ms CPU time)
+Ran 1 test suite in 107.12ms (106.16ms CPU time): 8 tests passed, 0 failed, 0 skipped (8 total tests)
 ```
 
-`forge test` in contracts/, exit code 0, 2026-11-25T11:02:36.504Z.
+`forge test` in contracts/, exit code 0, 2026-11-25T11:17:43.605Z.
 <!-- PROOF:END forge-test -->
+
+**Demo state (anchor leases)**
+
+<!-- PROOF:BEGIN demo-state -->
+Not run in this build: NEXT_PUBLIC_CONTRACT_ADDRESS is not configured.
+<!-- PROOF:END demo-state -->
+
+## Demo reset
+
+The wow step needs three wallets, because DepositVault checks `msg.sender` for every side: the tenant (Larissa), the landlord (Otávio) and the arbiter (Camila).
+
+1. Generate three keys once with `cast wallet new`.
+2. Put them in `.env.local` as `DEMO_TENANT_KEY`, `DEMO_LANDLORD_KEY` and `DEMO_ARBITER_KEY`, next to `PRIVATE_KEY` (the farm wallet, which pays the gas top-ups) and `DEPLOYED_CONTRACT`. These keys are read only by forge and the reset script, never by the app.
+3. Import each key into its own browser profile, so each window signs as one role.
+4. Run `npm run demo:reset`. It rewrites `fixtures/leases.json`, then runs `contracts/script/SeedDemo.s.sol`, which tops up each role wallet with 0.002 ETH when it holds less than 0.001, mints 10,000 MockUSDG to the tenant, and opens two fresh leases: Rua Harmonia 302 with the window (400) and the paint (900) listed, and Alameda Santos 1140 with a silent landlord whose 60 second window starts right away.
+
+The chain is append-only, so a reset cannot rewind a lease. It opens new ones, and the desk shows only the newest lease matching each anchor fingerprint (deposit, item count, claimed total or window). Older cycles and the smoke lease disappear from the desk, so every cycle starts from the same screen. Missing keys print `Not run: missing <KEY>`; the script always exits 0.
+
+There is no database: the chain is the store, and `lib/config.ts` says where it is. No schema push applies. The salt of a sealed offer lives in the sealing browser's localStorage (with a "Download salt backup" file next to it), which is per-user browser state, not a store.
 
 ## Try the demo
 
@@ -89,7 +108,7 @@ The desk opens on Rua Harmonia 302: Larissa moved out, Otávio listed a cracked 
 
 ## What we would build next
 
-- A wallet connect button through wagmi and RainbowKit, with per-step transaction status.
+- A wallet button over viem and the browser wallet, with per-step transaction status.
 - Foundry tests for every timeout path, plus Arbiscan verification.
 - An agency pilot with one São Paulo imobiliária managing 50 live leases from one panel.
 - Pix on-ramp so a tenant can fund the deposit in reais and get USDG locked in one step.
