@@ -6,7 +6,7 @@ import type { Hex } from "viem";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { formatUsdg, seedParty, type Lease, type OpenLeaseInput } from "@/lib/data";
+import { formatUsdg, seedParty, type Lease, type OpenLeaseInput, type Party } from "@/lib/data";
 import { EXPLORER } from "@/lib/config";
 import { sendVaultTx, sha256Hex, type VaultTx } from "@/lib/vault";
 
@@ -71,10 +71,14 @@ export function OpenLeasePanel({ template }: { template: Lease | null }) {
       setState({ kind: "error", message: problem });
       return;
     }
+    // A name that matches the template keeps the template's address: on a chain-backed desk
+    // that is the real demo wallet of Otávio or Camila, so the new lease is one they can act on.
+    const party = (name: string, fromTemplate: Party | undefined): Party =>
+      fromTemplate && fromTemplate.name === name ? { name, address: fromTemplate.address } : seedParty(name);
     const input: OpenLeaseInput = {
-      tenant: seedParty(tenant.trim()),
-      landlord: seedParty(landlord.trim()),
-      arbiter: { ...seedParty(arbiter.trim()), agency },
+      tenant: party(tenant.trim(), template?.tenant),
+      landlord: party(landlord.trim(), template?.landlord),
+      arbiter: { ...party(arbiter.trim(), template?.arbiter), agency },
       deposit,
       windowDays: windowNumber,
       entryPhoto: photo.kind === "hashed" ? photo.hash : null,
@@ -82,12 +86,14 @@ export function OpenLeasePanel({ template }: { template: Lease | null }) {
     setState({ kind: "sending" });
     try {
       // buildVaultArgs in lib/vault.ts turns the USDG amount and the window into contract units.
-      const tx = await sendVaultTx("openLease", 0, [
-        input.landlord.address,
-        input.arbiter.address,
-        input.deposit,
-        input.windowDays * 86_400,
-      ]);
+      // openLease always creates a chain lease, so origin is "chain": real with a vault address
+      // and a browser wallet, simulated otherwise.
+      const tx = await sendVaultTx(
+        "openLease",
+        0,
+        [input.landlord.address, input.arbiter.address, input.deposit, input.windowDays * 86_400],
+        "chain"
+      );
       setState({ kind: "done", input, tx });
     } catch (err) {
       const cause = err instanceof Error ? (err.cause as { hint?: unknown } | undefined) : undefined;

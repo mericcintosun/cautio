@@ -1,0 +1,56 @@
+"use client";
+
+import { EXPLORER } from "@/lib/config";
+import { shortHex } from "@/lib/data";
+import type { WalletState } from "@/lib/wallet-state";
+
+/** The receipt row under a lease: one branch per wallet state, tx states get their own copy. */
+export function TxStatus({ state }: { state: WalletState }) {
+  switch (state.kind) {
+    case "disconnected":
+    case "connecting":
+    case "idle":
+      return null;
+    case "wrong-network":
+      return (
+        <p className="border-t-2 border-dashed border-border pt-3 text-xs text-warn">
+          Your wallet is on another network. Use &quot;Switch to Arbitrum Sepolia&quot; in the header before signing.
+        </p>
+      );
+    case "tx-pending":
+      return (
+        <p aria-live="polite" className="border-t-2 border-dashed border-border pt-3 text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground">{state.label}</span> · waiting for the wallet and the block. Buttons are
+          paused until it lands.
+        </p>
+      );
+    case "tx-confirmed":
+      return (
+        <p aria-live="polite" className="border-t-2 border-dashed border-border pt-3 text-xs text-muted-foreground">
+          Last call: <span className="font-semibold text-foreground">{state.label}</span> ·{" "}
+          {state.simulated ? (
+            <>tx {shortHex(state.hash, 10, 6)} (simulated: no vault address, no browser wallet or a sample lease)</>
+          ) : (
+            <>
+              confirmed on Arbitrum Sepolia ·{" "}
+              <a className="underline decoration-primary decoration-2" href={`${EXPLORER}/tx/${state.hash}`} target="_blank" rel="noreferrer">
+                {shortHex(state.hash, 10, 6)} on Arbiscan
+              </a>
+            </>
+          )}
+        </p>
+      );
+    case "tx-rejected":
+      return (
+        <p role="status" className="border-t-2 border-dashed border-border pt-3 text-xs text-warn">
+          <span className="font-semibold">{state.label}</span> · You closed the wallet. Nothing was sent.
+        </p>
+      );
+    case "tx-failed":
+      return (
+        <p role="alert" className="rounded-sm border-2 border-destructive bg-background px-3 py-2 text-sm text-destructive">
+          <span className="font-semibold">{state.label} did not go through.</span> {state.hint}
+        </p>
+      );
+  }
+}

@@ -33,6 +33,10 @@ export interface DeductionItem {
 export interface SeedOffer {
   amount: number;
   salt: Hex;
+  /** Chain leases only: the commit read from DepositVault. Seed offers derive it from amount and salt. */
+  commit?: Hex;
+  /** Chain leases only: whether this side has revealed. Until then `amount` and `salt` are unknown (0 and zero hash). */
+  revealed?: boolean;
 }
 
 export interface Lease {
@@ -54,6 +58,8 @@ export interface Lease {
   offers: { landlord: SeedOffer | null; tenant: SeedOffer | null; opened: boolean };
   landlordAward: number | null;
   note: string;
+  /** "chain" when read from DepositVault (writes may be real); missing or "seed" means seed data (writes simulated). */
+  origin?: "chain" | "seed";
 }
 
 /** Envelope for every /api response. `source` says whether the data came from seed or chain. */

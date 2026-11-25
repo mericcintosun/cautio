@@ -6,11 +6,19 @@ import { depositVaultAbi, publicClient } from "../vault";
 import type { CautioAdapter } from "./index";
 
 // Chain-backed reads: DepositVault on Arbitrum Sepolia over the public RPC.
-// Human fields (street, names, item labels, notes) are not stored on chain, so they
-// are overlaid from the seed lease with the same onchainId when one exists.
+//
+// The chain is append-only, so `npm run demo:reset` cannot rewind a lease; it opens fresh
+// ones (contracts/script/SeedDemo.s.sol). DEMO_ANCHORS recognizes those leases by a
+// fingerprint on the raw lease row, and the NEWEST matching id wins. Anchors get the seed
+// lease's human labels (street, names, item labels) and origin "chain", so their writes are
+// real. Chain leases without an anchor show as "Lease #N" only when their id is above the
+// newest anchor id (for example the lease opened in demo step 1); older ones, such as the
+// Smoke lease #1 and every earlier reset cycle, are hidden, so each cycle shows the same desk.
+// The other seed leases render from the seed with onchainId 0, so their writes stay simulated.
 // Any RPC failure falls back to the seed leases, so the desk is never empty.
 
-const MAX_LEASES = 50;
+/** How many of the newest lease ids one read looks at. */
+const MAX_LEASES = 24;
 const MEMO_MS = 5000;
 
 /** DepositVault.Phase indices 1..7, in contract order. 0 (None) never appears for a real id. */
@@ -26,22 +34,40 @@ const PHASE_BY_INDEX: Record<number, Phase> = {
 const ITEMIZED_INDEX = 3;
 const RULED_INDEX = 6;
 
-type LeaseRow = readonly [
-  Address, // tenant
-  Address, // landlord
-  Address, // arbiter
-  bigint, // deposit
-  bigint, // claimedTotal
-  bigint, // acceptedTotal
-  bigint, // disputedTotal
-  bigint, // landlordAward
-  bigint, // window
-  bigint, // deadline
-  number, // phase
-  number, // itemCount
+export type LeaseRow = readonly [
+  Address, // 0 tenant
+  Address, // 1 landlord
+  Address, // 2 arbiter
+  bigint, // 3 deposit
+  bigint, // 4 claimedTotal
+  bigint, // 5 acceptedTotal
+  bigint, // 6 disputedTotal
+  bigint, // 7 landlordAward
+  bigint, // 8 window
+  bigint, // 9 deadline
+  number, // 10 phase
+  number, // 11 itemCount
 ];
 type ItemRow = readonly [bigint, Hex, Hex, boolean];
 type OfferRow = readonly [Hex, bigint, boolean];
+
+export interface DemoAnchor {
+  seedId: string;
+  /** True for the lease rows SeedDemo.s.sol opens for this seed lease. Fields never change over the flow. */
+  match: (row: LeaseRow) => boolean;
+}
+
+/** Keep in step with contracts/script/SeedDemo.s.sol and the demo-state block in scripts/proof.mjs. */
+export const DEMO_ANCHORS: readonly DemoAnchor[] = [
+  {
+    seedId: "rua-harmonia-302",
+    match: (r) => r[3] === 3_000_000_000n && r[11] === 2 && r[4] === 1_300_000_000n,
+  },
+  {
+    seedId: "alameda-santos-1140",
+    match: (r) => r[3] === 3_600_000_000n && r[11] === 0 && r[8] === 60n,
+  },
+];
 
 type ChainRead =
   | { ok: true; leases: Lease[]; block: bigint; vault: Address }
@@ -51,9 +77,8 @@ const copy = <T,>(value: T): T => structuredClone(value);
 const usdg = (raw: bigint): number => Number(raw) / 10 ** USDG_DECIMALS;
 const shortAddr = (a: Address): string => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
-function toLease(id: number, row: LeaseRow, itemRows: ItemRow[], tenantOffer: OfferRow, landlordOffer: OfferRow): Lease {
+function toLease(id: number, row: LeaseRow, itemRows: ItemRow[], tenantOffer: OfferRow, landlordOffer: OfferRow, seed: Lease | null): Lease {
   const [tenant, landlord, arbiter, deposit, , , , landlordAward, window, deadline, phaseIndex] = row;
-  const seed = seedLeases.find((l) => l.onchainId === id);
   const phase = PHASE_BY_INDEX[phaseIndex] ?? "Active";
   const answered = phaseIndex > ITEMIZED_INDEX;
 
@@ -72,13 +97,12 @@ function toLease(id: number, row: LeaseRow, itemRows: ItemRow[], tenantOffer: Of
     };
   });
 
-  // The chain keeps only the commit until a reveal. The salt lives with the party that
-  // sealed (localStorage); the seed's salt is reused for overlaid demo leases.
-  const offerFor = (row: OfferRow, seedOffer: SeedOffer | null | undefined): SeedOffer | null => {
-    const [commit, amount, revealed] = row;
+  // The chain keeps only the commit until a reveal. The amount and salt live with the
+  // party that sealed (browser localStorage), so an unrevealed offer carries the commit only.
+  const offerFor = (r: OfferRow): SeedOffer | null => {
+    const [commit, amount, revealed] = r;
     if (commit === zeroHash) return null;
-    if (revealed) return { amount: usdg(amount), salt: seedOffer?.salt ?? zeroHash };
-    return seedOffer ? copy(seedOffer) : null;
+    return { amount: revealed ? usdg(amount) : 0, salt: zeroHash, commit, revealed };
   };
 
   const depositUsdg = usdg(deposit);
@@ -92,7 +116,8 @@ function toLease(id: number, row: LeaseRow, itemRows: ItemRow[], tenantOffer: Of
     openedOn: seed?.openedOn ?? SEED_NOW.slice(0, 10),
     moveOutOn: seed?.moveOutOn ?? null,
     phase,
-    windowDays: Math.round(Number(window) / 864) / 100,
+    // Unrounded, so a 60 second demo window stays 60 seconds (lease-detail formats it).
+    windowDays: Number(window) / 86_400,
     deadline: deadline === 0n ? null : new Date(Number(deadline) * 1000).toISOString(),
     tenant: { name: seed?.tenant.name ?? `Tenant ${shortAddr(tenant)}`, address: tenant },
     landlord: { name: seed?.landlord.name ?? `Landlord ${shortAddr(landlord)}`, address: landlord },
@@ -103,13 +128,27 @@ function toLease(id: number, row: LeaseRow, itemRows: ItemRow[], tenantOffer: Of
     },
     items,
     offers: {
-      tenant: offerFor(tenantOffer, seed?.offers.tenant),
-      landlord: offerFor(landlordOffer, seed?.offers.landlord),
+      tenant: offerFor(tenantOffer),
+      landlord: offerFor(landlordOffer),
       opened: tenantOffer[2] && landlordOffer[2],
     },
     landlordAward: phaseIndex >= RULED_INDEX ? usdg(landlordAward) : null,
     note: seed?.note ?? "Read from DepositVault on Arbitrum Sepolia.",
+    origin: "chain",
   };
+}
+
+/**
+ * For each anchor, the newest id whose row matches its fingerprint.
+ * `ids` must be in descending order.
+ */
+export function resolveAnchors(ids: number[], rows: LeaseRow[]): Map<string, number> {
+  const found = new Map<string, number>();
+  for (const anchor of DEMO_ANCHORS) {
+    const k = ids.findIndex((_, i) => anchor.match(rows[i]));
+    if (k !== -1) found.set(anchor.seedId, ids[k]);
+  }
+  return found;
 }
 
 async function readChain(vault: Address): Promise<ChainRead> {
@@ -119,8 +158,10 @@ async function readChain(vault: Address): Promise<ChainRead> {
       publicClient.getBlockNumber(),
       publicClient.readContract({ address: vault, abi: depositVaultAbi, functionName: "leaseCount" }),
     ]);
-    const n = Math.min(Number(count), MAX_LEASES);
-    const ids = Array.from({ length: n }, (_, i) => i + 1);
+    const newest = Number(count);
+    const n = Math.min(newest, MAX_LEASES);
+    // Newest first: leaseCount, leaseCount - 1, ...
+    const ids = Array.from({ length: n }, (_, i) => newest - i);
     if (n === 0) {
       console.info(`${LOG_PREFIX} chain read leases=0 ms=${Date.now() - started}`);
       return { ok: false, reason: "Sample data: DepositVault holds no leases yet" };
@@ -136,8 +177,14 @@ async function readChain(vault: Address): Promise<ChainRead> {
       })),
     })) as unknown as LeaseRow[];
 
+    const anchors = resolveAnchors(ids, rows);
+    const newestAnchorId = Math.max(0, ...anchors.values());
+    const anchoredIds = new Set(anchors.values());
+    // Only anchors and leases newer than the newest anchor are shown, so only they are read further.
+    const shown = ids.map((id, k) => ({ id, k })).filter(({ id }) => anchoredIds.has(id) || id > newestAnchorId);
+
     // itemCount is capped at MAX_ITEMS = 16 by the contract.
-    const itemCalls = ids.flatMap((id, k) =>
+    const itemCalls = shown.flatMap(({ id, k }) =>
       Array.from({ length: Number(rows[k][11]) }, (_, i) => ({
         address: vault,
         abi: depositVaultAbi,
@@ -145,7 +192,7 @@ async function readChain(vault: Address): Promise<ChainRead> {
         args: [BigInt(id), BigInt(i)] as const,
       }))
     );
-    const offerCalls = ids.flatMap((id, k) =>
+    const offerCalls = shown.flatMap(({ id, k }) =>
       [rows[k][0], rows[k][1]].map((party) => ({
         address: vault,
         abi: depositVaultAbi,
@@ -157,19 +204,40 @@ async function readChain(vault: Address): Promise<ChainRead> {
       itemCalls.length > 0
         ? (publicClient.multicall({ allowFailure: false, contracts: itemCalls }) as unknown as Promise<ItemRow[]>)
         : Promise.resolve([] as ItemRow[]),
-      publicClient.multicall({ allowFailure: false, contracts: offerCalls }) as unknown as Promise<OfferRow[]>,
+      offerCalls.length > 0
+        ? (publicClient.multicall({ allowFailure: false, contracts: offerCalls }) as unknown as Promise<OfferRow[]>)
+        : Promise.resolve([] as OfferRow[]),
     ]);
 
+    const byId = new Map<number, Lease>();
     let cursor = 0;
-    const leases = ids.map((id, k) => {
-      const count = Number(rows[k][11]);
-      const items = itemResults.slice(cursor, cursor + count);
-      cursor += count;
-      return toLease(id, rows[k], items, offerResults[2 * k], offerResults[2 * k + 1]);
+    shown.forEach(({ id, k }, j) => {
+      const itemCount = Number(rows[k][11]);
+      const items = itemResults.slice(cursor, cursor + itemCount);
+      cursor += itemCount;
+      const seedId = [...anchors.entries()].find(([, anchorId]) => anchorId === id)?.[0];
+      const seed = seedId ? (seedLeases.find((l) => l.id === seedId) ?? null) : null;
+      byId.set(id, toLease(id, rows[k], items, offerResults[2 * j], offerResults[2 * j + 1], seed));
     });
 
-    console.info(`${LOG_PREFIX} chain read leases=${leases.length} ms=${Date.now() - started}`);
-    return { ok: true, leases, block, vault };
+    // Seed order first: anchored leases from the chain, the rest from the seed with
+    // onchainId 0 (simulated writes). Then any newer chain lease, newest first.
+    const desk: Lease[] = seedLeases.map((s) => {
+      const anchorId = anchors.get(s.id);
+      const fromChain = anchorId !== undefined ? byId.get(anchorId) : undefined;
+      return fromChain ?? { ...copy(s), onchainId: 0, origin: "seed" as const };
+    });
+    for (const { id } of shown) {
+      if (!anchoredIds.has(id)) {
+        const lease = byId.get(id);
+        if (lease) desk.push(lease);
+      }
+    }
+
+    console.info(
+      `${LOG_PREFIX} chain read leases=${shown.length} anchors=${anchors.size} newestAnchor=${newestAnchorId} ms=${Date.now() - started}`
+    );
+    return { ok: true, leases: desk, block, vault };
   } catch {
     console.warn(`${LOG_PREFIX} chain read failed ms=${Date.now() - started}`);
     return { ok: false, reason: "Sample data: Arbitrum Sepolia RPC did not answer" };
