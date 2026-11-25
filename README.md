@@ -1,8 +1,33 @@
 # Cautio
 
-**A rental deposit held in a shared USDG vault on Arbitrum. At move-out every deduction is its own photo-backed line, and any dispute ends with an arbiter picking one of two sealed final offers.**
+**Cautio holds a São Paulo rental deposit in a USDG vault on Arbitrum that neither landlord nor tenant can move alone. At move-out every deduction is its own photo-backed line, and a dispute ends with an arbiter picking one of two sealed final offers, so the tenant is no longer handed one unexplained lump sum.**
 
-> Live demo: https://cautio-beta.vercel.app
+- Live: https://cautio-beta.vercel.app
+- Click: DEMO step 2, `/?lease=rua-harmonia-302`
+
+**Real or simulated on the live URL.** The status line above the desk says which. While it reads "Sample data: DepositVault address is not configured", the desk shows the ten seeded leases and every write is simulated in the browser; the block number under it is still a real Arbitrum Sepolia read. Once a vault is deployed it reads "Live: DepositVault 0x… on Arbitrum Sepolia, block N" and the two anchor leases sign real DepositVault transactions.
+
+### Try it in 60 seconds
+
+1. Open https://cautio-beta.vercel.app/?lease=rua-harmonia-302. Otávio listed a cracked window (400 USDG) and a repaint (900 USDG). Accept the window, dispute the paint, press "Send answers to the vault".
+2. Drag Otávio's marker to 900 and Larissa's to 300 on the sealed-offer rails (the preview reads "Otávio gets 700 · Larissa gets back 2,300"), seal both, press "Open both offers", pick Larissa's 300, then "Settle in one transaction": 700 to Otávio, 2,300 back to Larissa.
+3. Open https://cautio-beta.vercel.app/?lease=alameda-santos-1140. The landlord never listed anything; press "Claim full refund of 3,600 USDG".
+
+## Architecture
+
+```mermaid
+flowchart LR
+  page["app/page.tsx (server)"] --> desk["components/lease-desk.tsx"]
+  page --> adapter["lib/adapter (fake.ts | real.ts)"]
+  desk --> detail["components/lease-detail.tsx"]
+  detail --> vault["lib/vault.ts (viem)"]
+  adapter -->|"real: multicall reads"| contract["DepositVault on Arbitrum Sepolia"]
+  vault -->|"browser wallet writes"| contract
+  contract --> token["MockUSDG / Paxos USDG"]
+  adapter -->|"fake: seed leases"| seed["lib/data/seed.ts"]
+```
+
+Reads go through `getAdapter()` on the server (`ADAPTER_MODE=fake` by default, `real` reads DepositVault). Writes go through `sendVaultTx()` in `lib/vault.ts` in the browser: real with a vault address and a wallet, simulated otherwise.
 
 ## The problem
 
@@ -56,14 +81,30 @@ Depth test: remove `token` from the vault and DEMO steps 1, 3 and 5 break, becau
 
 ## Tech stack
 
-Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS v4, shadcn-style primitives, Motion 14 for layout transitions, viem 2, zod 3, Solidity 0.8.24 with Foundry, Arbitrum Sepolia, Paxos USDG (MockUSDG on testnet), Vercel.
+Next.js 15 (App Router), React 19, TypeScript 5, Tailwind CSS v4, shadcn-style primitives on class-variance-authority, lucide-react icons, Motion 14 (shared layout, the draggable offer rail, presence staging), viem 2, zod 3, Solidity 0.8.24 with Foundry in `contracts/`, Arbitrum Sepolia, Paxos USDG (MockUSDG on testnet), Vercel. The wallet layer is a small React context over viem and `window.ethereum`.
 
 ## Quickstart
 
 ```bash
+git clone https://github.com/mericcintosun/cautio && cd cautio
 npm install
-npm run dev        # http://localhost:3000
+npm run dev              # http://localhost:3000
+npm run test:contracts   # forge test in contracts/
+npm run proof            # rewrites the proof blocks in README.md and SUBMISSION.md
 ```
+
+## Addresses
+
+<!-- PROOF:BEGIN addresses -->
+| What | Where |
+| --- | --- |
+| Live URL | https://cautio-beta.vercel.app |
+| DepositVault | Not run in this build: NEXT_PUBLIC_CONTRACT_ADDRESS is not configured. |
+<!-- PROOF:END addresses -->
+
+Written by `npm run proof` from the same read as the chain-read block below. Env keys live in `.env.example`.
+
+## Running against a vault
 
 The app runs with no environment variables: it reads Arbitrum Sepolia live and shows ten seeded São Paulo leases, and every write is simulated. To point it at a deployed vault, copy `.env.example` to `.env.local`, set `NEXT_PUBLIC_CONTRACT_ADDRESS`, and set `ADAPTER_MODE=real` to read the desk from the chain. Writes then go through your browser wallet on Arbitrum Sepolia.
 
@@ -85,7 +126,7 @@ Written by `npm run proof`. Each block says plainly when it has not run.
 **Chain read**
 
 <!-- PROOF:BEGIN chain-read -->
-Arbitrum Sepolia (421614) block 332583922 read in 270 ms on 2026-11-25T11:29:48.942Z.
+Arbitrum Sepolia (421614) block 332587066 read in 322 ms on 2026-11-25T11:45:02.427Z.
 
 Not run in this build: NEXT_PUBLIC_CONTRACT_ADDRESS is not configured.
 <!-- PROOF:END chain-read -->
@@ -94,11 +135,11 @@ Not run in this build: NEXT_PUBLIC_CONTRACT_ADDRESS is not configured.
 
 <!-- PROOF:BEGIN forge-test -->
 ```
-Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 81.19ms (86.47ms CPU time)
-Ran 1 test suite in 82.36ms (81.19ms CPU time): 12 tests passed, 0 failed, 0 skipped (12 total tests)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 150.62ms (164.65ms CPU time)
+Ran 1 test suite in 153.16ms (150.62ms CPU time): 12 tests passed, 0 failed, 0 skipped (12 total tests)
 ```
 
-`forge test` in contracts/, exit code 0, 2026-11-25T11:29:49.695Z.
+`forge test` in contracts/, exit code 0, 2026-11-25T11:45:03.025Z.
 <!-- PROOF:END forge-test -->
 
 **Demo state (anchor leases)**
@@ -137,6 +178,8 @@ See `SECURITY.md` for the contract address, wallet permissions and the exact app
 
 ## AI use
 
-> We used AI coding assistants for scaffolding and boilerplate. Architecture, product decisions, and final code review are our own.
+AI coding assistants (Claude Code) wrote most of the code in this repository under the builder's direction: the builder set the product, the contract rules and the demo path, and reviewed and ran what was written. The hackathon page states no AI policy; the Terms and Conditions PDF was not readable when this was written.
 
-(Adjust this section to the hackathon's disclosure rules before submitting.)
+## License
+
+MIT, see LICENSE.

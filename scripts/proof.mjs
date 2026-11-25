@@ -1,10 +1,11 @@
 // npm run proof
-// Writes three proof blocks into README.md:
+// Writes proof blocks into README.md and SUBMISSION.md (each file gets the blocks it has):
+//   addresses:  Live URL and DepositVault rows, the vault linked to Arbiscan when set
 //   chain-read: Arbitrum Sepolia block number and latency, plus leaseCount() and token()
 //               when NEXT_PUBLIC_CONTRACT_ADDRESS is set
 //   forge-test: the Suite result and passed lines of `forge test` in contracts/
 //   demo-state: id, phase and deposit of the two demo anchor leases (newest fingerprint match)
-// Never throws for a missing key, always exits 0, writes only README.md.
+// Never throws for a missing key, always exits 0, writes only README.md and SUBMISSION.md.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -14,7 +15,8 @@ import { createPublicClient, http, isAddress, parseAbi } from "viem";
 import { arbitrumSepolia } from "viem/chains";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const README = join(ROOT, "README.md");
+const TARGETS = [join(ROOT, "README.md"), join(ROOT, "SUBMISSION.md")];
+const LIVE_URL = "https://cautio-beta.vercel.app";
 const RPC_TIMEOUT_MS = 8000;
 const RPC_RETRY_COUNT = 1;
 const FORGE_TIMEOUT_MS = 90_000;
@@ -160,13 +162,26 @@ function forgeTest() {
   return { summary: `forge-test: ${unique[unique.length - 1] ?? status}`, body };
 }
 
-function writeBlock(text, name, body) {
+/** The addresses table: never hand-typed, always from the configured env. */
+function addresses(env) {
+  const address = env.NEXT_PUBLIC_CONTRACT_ADDRESS ?? "";
+  const vault = isAddress(address) ? address : null;
+  const row = vault
+    ? `| DepositVault | [${vault}](${EXPLORER}/address/${vault}) (Arbitrum Sepolia, 421614) |`
+    : "| DepositVault | Not run in this build: NEXT_PUBLIC_CONTRACT_ADDRESS is not configured. |";
+  return {
+    summary: vault ? `addresses: vault ${vault}` : "addresses: no vault address",
+    body: ["| What | Where |", "| --- | --- |", `| Live URL | ${LIVE_URL} |`, row].join("\n"),
+  };
+}
+
+function writeBlock(text, name, body, file) {
   const begin = `<!-- PROOF:BEGIN ${name} -->`;
   const end = `<!-- PROOF:END ${name} -->`;
   const i = text.indexOf(begin);
   const j = text.indexOf(end);
   if (i === -1 || j === -1 || j < i) {
-    console.log(`proof: README.md has no ${name} block, skipped`);
+    console.log(`proof: ${file} has no ${name} block, skipped`);
     return text;
   }
   return `${text.slice(0, i + begin.length)}\n${body}\n${text.slice(j)}`;
@@ -174,6 +189,8 @@ function writeBlock(text, name, body) {
 
 async function main() {
   const env = loadEnv();
+  const addr = addresses(env);
+  console.log(addr.summary);
   const chain = await chainRead(env);
   console.log(chain.summary);
   const forge = forgeTest();
@@ -181,15 +198,19 @@ async function main() {
   const demo = await demoState(env);
   console.log(demo.summary);
 
-  if (!existsSync(README)) {
-    console.log("proof: README.md not found, nothing written");
-    return;
+  for (const target of TARGETS) {
+    const file = target.slice(ROOT.length + 1);
+    if (!existsSync(target)) {
+      console.log(`proof: ${file} not found, nothing written`);
+      continue;
+    }
+    let text = readFileSync(target, "utf8");
+    text = writeBlock(text, "addresses", addr.body, file);
+    text = writeBlock(text, "chain-read", chain.body, file);
+    text = writeBlock(text, "forge-test", forge.body, file);
+    text = writeBlock(text, "demo-state", demo.body, file);
+    writeFileSync(target, text);
   }
-  let text = readFileSync(README, "utf8");
-  text = writeBlock(text, "chain-read", chain.body);
-  text = writeBlock(text, "forge-test", forge.body);
-  text = writeBlock(text, "demo-state", demo.body);
-  writeFileSync(README, text);
 }
 
 main()

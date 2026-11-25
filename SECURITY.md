@@ -27,7 +27,7 @@
 
 Forms: the open-lease panel and the landlord listing form send only to DepositVault through `sendVaultTx` in `lib/vault.ts`. The `/api/leases` routes are read-only. Photos are hashed in the browser and never uploaded.
 
-**Known limits.** Blockaid warnings on a new domain are partly reputation based, so a wallet may flag the site even though the calls are the ones listed above. The builder's video shows the full wallet flow.
+**Known limits.** Blockaid warnings on a new domain are partly reputation based, so a wallet may flag the site even though the calls are the ones listed above.
 
 ## Source
 

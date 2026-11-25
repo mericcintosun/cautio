@@ -2,6 +2,64 @@ REDEPLOY NEEDED: DepositVault (measured deposit, Settled event with parties, own
 
 # HANDOFF: Cautio
 
+## Phase 5: riso desk pass, sealed-offer slider, submission package (2026-11-25)
+
+### Goal
+A judge opening `/` cold on a phone sees the lease desk in the first viewport; on DEMO step 3 each side sets its sealed number by dragging a marker on a 0 to 900 USDG rail with a live "Otávio gets / Larissa gets back" preview; phase changes enter and exit through `AnimatePresence`; README.md, SUBMISSION.md and LICENSE are ready to submit.
+
+### Status per slice
+- **Deliverable 0 done.** `.farm-delta.md` (12 diagnosis items, 21 change rows: 14 A, 7 B, 1 Kept), proof greps recorded there.
+- **A done.** Claim band in `app/page.tsx` (h1 `text-5xl sm:text-6xl lg:text-7xl`, one sentence, one `Button asChild` to `/?view=open` "Lock a deposit", one-sentence "Example loaded" note from the seed, `<details className="cautio-fold">` kept, scene 1 `hidden md:block`). Visible "Cautio" wordmark. No-wallet header state is an outline `Badge` "No wallet: writes simulated". `button.tsx` disabled = `disabled:opacity-60 disabled:text-foreground`. `components/ui/file-input.tsx` (`FileInput`, forwardRef, sr-only input, plate label, file name or "No photo yet", `peer-focus-visible` ring) replaces all three file inputs; the three `onFile`/`onPhoto` hashing handlers are untouched. Sample-data notice on SURFACE with `.riso-plate`. Deduction-row photo check stacks above Accept/Dispute on mobile (was a squeezed column). States (`desk-states.tsx`, `not-found.tsx`) are `Card`s with a halftone band; `app/error.tsx`, `app/loading.tsx`, `app/about/loading.tsx` render them unchanged. Footer is one row of links plus "Built for Arbitrum Open House São Paulo."
+- **B1 done.** `components/diagonal-split.tsx`: `DeskPhaseProvider`, `useReportDeskPhase` (called from `lease-desk.tsx`), `DiagonalSplit` (two `motion.div`s, `initial={false}`, `animate={{ clipPath }}`, 600ms easeInOut, top edge 46% at Active to 40% at Settled in 1% steps, `MotionConfig reducedMotion="user"`). Six scene slots placed, six SVGs written.
+- **B2 done.** `components/offer-rail.tsx` (`OfferRail`): `drag="x"`, `dragConstraints` = rail ref, `dragElastic={0}`, `dragMomentum={false}`, `useMotionValue` x, `useTransform` to USDG rounded to 10, `role="slider"` with arrows ±10 and Shift ±100 (Home/End too), number `Input` kept and synced both ways, disabled when pending or phase is not `Sealed`. Preview text built from the lease (first names, `totals.accepted`, `lease.deposit`). `LeaseDetail`: `AnimatePresence mode="wait" initial={false}` keyed by `flow.phase`, deduction rows stagger (`staggerChildren: 0.07`, opacity only), `TxStatus` lines swap in their own `AnimatePresence`, all inside `MotionConfig reducedMotion="user"`.
+- **B3 done.** `/about`: one sentence per section plus a visual (scene 6, phase cards with halftone bands, Arbitrum cards), timeout and comparison tables folded behind `cautio-fold` summaries.
+- **C done.** README top (two-sentence what and why, live URL, step 2 link, "Try it in 60 seconds", real-or-simulated line), mermaid architecture, 5-command quickstart, `addresses` proof block, prize table untouched, stack line checked against package.json, AI use disclosure, license line. `SUBMISSION.md`, `LICENSE` (MIT), `docs/SCREENSHOTS.md`. `scripts/proof.mjs` writes an `addresses` block and now targets README.md and SUBMISSION.md. Video sentence removed from SECURITY.md; DELIVERY.md "video" reworded.
+- Nothing was built, tested or run by the agent.
+
+### Decisions
+- **Scene SVGs edited despite CLAUDE.md "never touch public/illustrations/".** The Phase 5 spec asks for redraws and new files, so the phase spec wins. Scenes 1 to 3 keep their drawings and alts, wrapped in a scaled group on the new canvas.
+- **Diagonal phase source.** A small React context (`DeskPhaseProvider` in `app/page.tsx`) carries the open lease's flow phase from `lease-desk.tsx` to the split. The server passes the initial lease's phase, so the server-rendered polygon already matches.
+- **Badge wraps on phones.** The header badge is `max-w-[8rem]` below `sm` (two lines) so mark, wordmark, Menu and badge fit at 360px.
+- **Disabled text.** `disabled:text-foreground` on every Button, so a disabled secondary reads INK on faded blue instead of stock on lavender.
+- **Deduction checker label.** The old wrapping `<label>` would have nested the FileInput label; it is now a `<div>` with the hint as `aria-describedby`.
+- **Stagger.** The deduction list sits in its own `AnimatePresence initial={false}`, so it staggers when it appears after "Send the list" and never on first paint.
+
+### Failed attempts
+None.
+
+### Files changed
+app/page.tsx, app/layout.tsx, app/not-found.tsx, app/about/page.tsx, components/wallet-button.tsx, components/ui/button.tsx, components/ui/file-input.tsx (new), components/open-lease-panel.tsx, components/lease-desk.tsx, components/lease-detail.tsx, components/desk-states.tsx, components/tx-status.tsx, components/diagonal-split.tsx (new), components/offer-rail.tsx (new), public/illustrations/scene-1.svg to scene-3.svg (redrawn canvas), scene-4.svg to scene-6.svg (new), scripts/proof.mjs, README.md, SUBMISSION.md (new), LICENSE (new), docs/SCREENSHOTS.md (new), SECURITY.md, DELIVERY.md, IDENTITY.md (Amendments only), HANDOFF.md, .farm-commits.json.
+
+### Commands run
+none, agent has no shell
+
+### SceneSlot fallback list
+All six are SVG fallbacks, no `public/brand/scene-*.png` uploaded.
+- n1 `/` (`app/page.tsx`, `md` and up) → `public/illustrations/scene-1.svg`
+- n2 `/` via `lease-detail.tsx` `ListingForm` empty state → `scene-2.svg`
+- n3 `/` via `lease-detail.tsx` `FinalOffers` while sealed (`sm` and up) → `scene-3.svg`
+- n4 `/` via `lease-detail.tsx` `Payout` → `scene-4.svg`
+- n5 `/` via `lease-detail.tsx` silent-landlord refund (`md` and up) → `scene-5.svg`
+- n6 `/about` (`app/about/page.tsx`) → `scene-6.svg`
+
+### Open questions
+- **HackQuest form fields** were not captured; SUBMISSION.md uses the standard order. Check against the real form.
+- **Two-track entry**: does the form allow both Overall Prize and Promising Products? If one, pick Overall Prize First Place.
+- **Testnet seat**: does an Arbitrum Sepolia deploy count for the reserved Arbitrum seat?
+- `motion` drag on the rail is unverified in a browser; check the marker lands under 300 after a drag and the arrow keys with reduced motion on.
+
+### Next best step
+Phase 6 judge fixes: run the 390 and 1440 screenshot pass against the BEFORE shots, fix whatever the build round reports, then the Kontrat deploy so README and SUBMISSION proof blocks carry the DepositVault address.
+
+### Manual submit checklist
+- Team member names typed into the HackQuest form.
+- The video link pasted straight into the form by the builder.
+- Track choice: Overall Prize First Place (plus Promising Products only if the form allows two).
+- The DepositVault address after the redeploy (`npm run proof` fills README and SUBMISSION), and SECURITY.md updated.
+- Submit before 28 Feb 2027.
+
+---
+
 ## Phase 4: live landlord listing, prize surface, then the security pass (2026-11-25)
 
 ### Goal

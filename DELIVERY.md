@@ -21,7 +21,7 @@ The submission window runs from 8 Feb 2027 03:01 to 1 Mar 2027 02:59, and the pa
 ## Before submitting
 
 - The live URL pasted in the form is `https://cautio-beta.vercel.app`.
-- Read the Terms and Conditions PDF for the team, video and AI rules.
+- Read the Terms and Conditions PDF for the team, media and AI rules.
 - Confirm whether an Arbitrum Sepolia deploy counts for the reserved Arbitrum seat.
 - Mention USDG in the form text (the vault's only token, `isFrozen` checked before every payout).
 - Check that the AI use line in README matches the rules.
