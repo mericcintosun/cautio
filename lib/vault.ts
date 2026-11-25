@@ -107,6 +107,7 @@ export async function sha256Hex(file: Blob): Promise<Hex> {
 }
 
 export type VaultWrite =
+  | "openLease"
   | "startMoveOut"
   | "respond"
   | "commitOffer"
