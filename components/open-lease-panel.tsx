@@ -2,12 +2,13 @@
 
 import { useId, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { parseUnits, type Hex } from "viem";
+import type { Hex } from "viem";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { formatUsdg, seedParty, type Lease, type OpenLeaseInput } from "@/lib/data";
-import { USDG_DECIMALS, sendVaultTx, sha256Hex, type VaultTx } from "@/lib/vault";
+import { EXPLORER } from "@/lib/config";
+import { sendVaultTx, sha256Hex, type VaultTx } from "@/lib/vault";
 
 /** How many months of rent the caução holds. */
 const RENT_MONTHS = 3;
@@ -21,8 +22,9 @@ type PanelState =
 type PhotoState = { kind: "none" } | { kind: "hashing" } | { kind: "hashed"; hash: Hex; name: string } | { kind: "error" };
 
 /**
- * Demo step 1: the tenant locks the deposit. Writes are mocked through sendVaultTx
- * until Phase 2 wires the wallet; the receipt says so.
+ * Demo step 1: the tenant locks the deposit. sendVaultTx approves USDG and calls
+ * openLease through the browser wallet when a vault address is configured, and
+ * simulates both calls otherwise; the receipt says which.
  */
 export function OpenLeasePanel({ template }: { template: Lease | null }) {
   const ids = useId();
@@ -79,15 +81,19 @@ export function OpenLeasePanel({ template }: { template: Lease | null }) {
     };
     setState({ kind: "sending" });
     try {
+      // buildVaultArgs in lib/vault.ts turns the USDG amount and the window into contract units.
       const tx = await sendVaultTx("openLease", 0, [
         input.landlord.address,
         input.arbiter.address,
-        parseUnits(String(input.deposit), USDG_DECIMALS),
-        BigInt(input.windowDays * 86_400),
+        input.deposit,
+        input.windowDays * 86_400,
       ]);
       setState({ kind: "done", input, tx });
     } catch (err) {
-      setState({ kind: "error", message: err instanceof Error ? err.message : "The vault call failed." });
+      const cause = err instanceof Error ? (err.cause as { hint?: unknown } | undefined) : undefined;
+      const message =
+        cause && typeof cause.hint === "string" ? cause.hint : err instanceof Error ? err.message : "The vault call failed.";
+      setState({ kind: "error", message });
     }
   }
 
@@ -109,7 +115,10 @@ export function OpenLeasePanel({ template }: { template: Lease | null }) {
           <ol className="space-y-2 text-sm">
             <li className="rounded-sm border-2 border-border bg-card px-3 py-2">
               <span className="font-semibold">1. approve {formatUsdg(state.input.deposit)}</span>
-              <span className="text-muted-foreground"> · USDG allowance for DepositVault, simulated</span>
+              <span className="text-muted-foreground">
+                {" "}
+                · USDG allowance for DepositVault, {state.tx.simulated ? "simulated" : "confirmed on Arbitrum Sepolia"}
+              </span>
             </li>
             <li className="space-y-1 rounded-sm border-2 border-border bg-card px-3 py-2">
               <p className="font-semibold">
@@ -117,7 +126,21 @@ export function OpenLeasePanel({ template }: { template: Lease | null }) {
               </p>
               <div className="overflow-x-auto">
                 <p className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">
-                  {state.tx.simulated ? "simulated" : "confirmed"} tx {state.tx.hash}
+                  {state.tx.simulated ? (
+                    <>simulated tx {state.tx.hash}</>
+                  ) : (
+                    <>
+                      confirmed on Arbitrum Sepolia ·{" "}
+                      <a
+                        className="underline decoration-primary decoration-2"
+                        href={`${EXPLORER}/tx/${state.tx.hash}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {state.tx.hash} on Arbiscan
+                      </a>
+                    </>
+                  )}
                 </p>
               </div>
             </li>
@@ -125,7 +148,7 @@ export function OpenLeasePanel({ template }: { template: Lease | null }) {
           <p className="text-sm text-muted-foreground">
             {state.input.tenant.name}&apos;s deposit is now held by the vault. Neither {state.input.landlord.name} nor{" "}
             {state.input.tenant.name} can move it alone.
-            {state.tx.simulated && " Vault writes are mocked until the wallet is wired."}
+            {state.tx.simulated && " Simulated: no vault address or browser wallet."}
           </p>
           <div className="flex flex-wrap gap-3">
             <Button asChild>
@@ -197,7 +220,8 @@ export function OpenLeasePanel({ template }: { template: Lease | null }) {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Runs two calls: approve {formatUsdg(deposit)}, then openLease. Both are simulated until the wallet is wired.
+            Runs two calls: approve {formatUsdg(deposit)}, then openLease. With a vault address and a browser wallet both
+            go to Arbitrum Sepolia; otherwise they are simulated.
           </p>
         </form>
       )}

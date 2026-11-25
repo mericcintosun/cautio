@@ -20,7 +20,8 @@ import {
   type Phase,
   type Side,
 } from "@/lib/data";
-import { EXPLORER, newSalt, offerCommit, rememberSalt, sendVaultTx, sha256Hex, type VaultWrite } from "@/lib/vault";
+import { EXPLORER } from "@/lib/config";
+import { newSalt, offerCommit, rememberSalt, sendVaultTx, sha256Hex, type VaultWrite } from "@/lib/vault";
 import { cn } from "@/lib/utils";
 
 export interface SealedOffer {
@@ -29,7 +30,7 @@ export interface SealedOffer {
   commit: Hex;
 }
 
-/** Local mirror of one lease's on-chain state while writes are still simulated. */
+/** Local mirror of one lease's on-chain state, advanced after each confirmed or simulated write. */
 export interface Flow {
   phase: Phase;
   answers: Record<string, Answer>;
@@ -65,14 +66,19 @@ export function LeaseDetail({ lease, flow, onChange }: { lease: Lease; flow: Flo
   const [error, setError] = useState<string | null>(null);
   const totals = totalsFor(lease.items, flow.answers);
 
-  async function act(label: string, fn: VaultWrite, args: readonly unknown[], next: Partial<Flow>) {
+  // Sends one vault write, or a short sequence (both reveals, or resolveTimeout then settle).
+  // The flow only advances once every call in the sequence has gone through.
+  async function act(label: string, fn: VaultWrite, args: readonly unknown[], next: Partial<Flow>, then: FollowUp[] = []) {
     setBusy(label);
     setError(null);
     try {
-      const tx = await sendVaultTx(fn, lease.onchainId, args);
+      let tx = await sendVaultTx(fn, lease.onchainId, args);
+      for (const [nextFn, nextArgs] of then) {
+        tx = await sendVaultTx(nextFn, lease.onchainId, nextArgs);
+      }
       onChange({ ...flow, ...next, lastTx: { label, ...tx } });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "The vault call failed.");
+      setError(hintOf(e));
     } finally {
       setBusy(null);
     }
@@ -158,11 +164,14 @@ export function LeaseDetail({ lease, flow, onChange }: { lease: Lease; flow: Flo
           <p className="border-t-2 border-dashed border-border pt-3 text-xs text-muted-foreground">
             Last call: <span className="font-semibold text-foreground">{flow.lastTx.label}</span> ·{" "}
             {flow.lastTx.simulated ? (
-              <>simulated tx {shortHex(flow.lastTx.hash, 10, 6)} (vault writes are mocked until the wallet is wired)</>
+              <>tx {shortHex(flow.lastTx.hash, 10, 6)} (simulated: no vault address or browser wallet)</>
             ) : (
-              <a className="underline decoration-primary decoration-2" href={`${EXPLORER}/tx/${flow.lastTx.hash}`} target="_blank" rel="noreferrer">
-                {shortHex(flow.lastTx.hash, 10, 6)} on Arbiscan
-              </a>
+              <>
+                confirmed on Arbitrum Sepolia ·{" "}
+                <a className="underline decoration-primary decoration-2" href={`${EXPLORER}/tx/${flow.lastTx.hash}`} target="_blank" rel="noreferrer">
+                  {shortHex(flow.lastTx.hash, 10, 6)} on Arbiscan
+                </a>
+              </>
             )}
           </p>
         )}
@@ -183,7 +192,18 @@ function PartyCell({ role, name, address }: { role: string; name: string; addres
   );
 }
 
-type Act = (label: string, fn: VaultWrite, args: readonly unknown[], next: Partial<Flow>) => Promise<void>;
+type FollowUp = readonly [VaultWrite, readonly unknown[]];
+type Act = (label: string, fn: VaultWrite, args: readonly unknown[], next: Partial<Flow>, then?: FollowUp[]) => Promise<void>;
+
+/** The human hint from sendVaultTx's CoreError cause, never raw provider text. */
+function hintOf(e: unknown): string {
+  if (e instanceof Error) {
+    const cause = e.cause as { hint?: unknown } | undefined;
+    if (cause && typeof cause.hint === "string") return cause.hint;
+    return e.message;
+  }
+  return "The vault call failed.";
+}
 
 function PhaseBody({
   lease,
@@ -200,13 +220,11 @@ function PhaseBody({
   act: Act;
   onChange: (next: Flow) => void;
 }) {
-  const id = lease.onchainId;
-
   switch (flow.phase) {
     case "Active":
       return (
         <Step title="Deposit locked" hint={`Opened ${formatDate(lease.openedOn)}. Neither ${lease.tenant.name} nor ${lease.landlord.name} can move it alone.`}>
-          <Button variant="outline" disabled={!!busy} onClick={() => act("startMoveOut", "startMoveOut", [id], { phase: "MoveOut", clockRunOut: false })}>
+          <Button variant="outline" disabled={!!busy} onClick={() => act("startMoveOut", "startMoveOut", [], { phase: "MoveOut", clockRunOut: false })}>
             {busy ? "Sending…" : "Announce move-out"}
           </Button>
         </Step>
@@ -220,7 +238,7 @@ function PhaseBody({
         >
           <Button
             disabled={!!busy}
-            onClick={() => act("resolveTimeout, then settle", "resolveTimeout", [id], { phase: "Settled", award: 0 })}
+            onClick={() => act("resolveTimeout, then settle", "resolveTimeout", [], { phase: "Settled", award: 0 }, [["settle", []]])}
           >
             {busy ? "Sending…" : `Claim full refund of ${formatUsdg(lease.deposit)}`}
           </Button>
@@ -252,7 +270,7 @@ function PhaseBody({
             variant="secondary"
             disabled={!ready || !!busy}
             onClick={() =>
-              act("respond", "respond", [id, mask], totals.disputed > 0 ? { phase: "Sealed" } : { phase: "Ruled", award: totals.accepted })
+              act("respond", "respond", [mask], totals.disputed > 0 ? { phase: "Sealed" } : { phase: "Ruled", award: totals.accepted })
             }
           >
             {busy ? "Sending…" : "Send answers to the vault"}
@@ -271,7 +289,7 @@ function PhaseBody({
           title="Ruling recorded"
           hint={`${formatUsdg(flow.award ?? 0)} goes to ${lease.landlord.name}, ${formatUsdg(lease.deposit - (flow.award ?? 0))} back to ${lease.tenant.name}. One call pays both.`}
         >
-          <Button disabled={!!busy} onClick={() => act("settle", "settle", [id], { phase: "Settled" })}>
+          <Button disabled={!!busy} onClick={() => act("settle", "settle", [], { phase: "Settled" })}>
             {busy ? "Settling…" : "Settle in one transaction"}
           </Button>
         </Step>
@@ -394,7 +412,6 @@ function FinalOffers({
     landlord: String(cap),
     tenant: String(Math.round(cap / 3 / 50) * 50),
   });
-  const id = lease.onchainId;
   const { landlord, tenant } = flow.offers;
 
   function seal(side: Side) {
@@ -404,7 +421,7 @@ function FinalOffers({
     rememberSalt(lease.id, side, salt);
     const sealed = sealFor(lease, side, amount, salt);
     const other = side === "landlord" ? tenant : landlord;
-    void act(`commitOffer (${side})`, "commitOffer", [id, sealed.commit], {
+    void act(`commitOffer (${side})`, "commitOffer", [sealed.commit], {
       offers: { ...flow.offers, [side]: sealed },
       phase: other ? "Revealed" : "Sealed",
     });
@@ -413,7 +430,7 @@ function FinalOffers({
   function pick(side: Side) {
     const offer = flow.offers[side];
     if (!offer) return;
-    void act(`pickOffer (${side}'s number)`, "pickOffer", [id, side === "tenant"], {
+    void act(`pickOffer (${side}'s number)`, "pickOffer", [side === "tenant"], {
       phase: "Ruled",
       award: totals.accepted + offer.amount,
     });
@@ -479,7 +496,11 @@ function FinalOffers({
             variant="secondary"
             disabled={!!busy}
             onClick={() =>
-              act("revealOffer × 2", "revealOffer", [id, landlord?.amount, tenant?.amount], { opened: true })
+              landlord &&
+              tenant &&
+              act("revealOffer × 2", "revealOffer", [landlord.amount, landlord.salt], { opened: true }, [
+                ["revealOffer", [tenant.amount, tenant.salt]],
+              ])
             }
           >
             {busy ? "Opening…" : "Open both offers"}
