@@ -1,12 +1,30 @@
+import type { Metadata } from "next";
 import { LeaseDesk } from "@/components/lease-desk";
+import { OpenLeasePanel } from "@/components/open-lease-panel";
 import { SceneSlot } from "@/components/scene-slot";
-import { DEFAULT_LEASE_ID, leases } from "@/lib/data";
+import { getAdapter } from "@/lib/adapter";
+import { DEFAULT_LEASE_ID } from "@/lib/data";
+
+type HomeSearch = Promise<{ lease?: string; view?: string }>;
+
+export async function generateMetadata({ searchParams }: { searchParams: HomeSearch }): Promise<Metadata> {
+  const { lease, view } = await searchParams;
+  if (view === "open") return { title: "Open a deposit" };
+  if (lease) {
+    const found = await getAdapter().getLease(lease);
+    if (found) return { title: found.street };
+  }
+  return { title: "Lease desk" };
+}
 
 // S1 single-surface + L7 diagonal: the claim sits on the stock-colored side, the live
 // lease desk sits on the orange block cut by a diagonal clip-path.
-export default async function Home({ searchParams }: { searchParams: Promise<{ lease?: string }> }) {
-  const { lease } = await searchParams;
-  const initialId = leases.some((l) => l.id === lease) ? (lease as string) : DEFAULT_LEASE_ID;
+export default async function Home({ searchParams }: { searchParams: HomeSearch }) {
+  const { lease, view } = await searchParams;
+  const leases = await getAdapter().listLeases();
+  const fallbackId = leases.some((l) => l.id === DEFAULT_LEASE_ID) ? DEFAULT_LEASE_ID : (leases[0]?.id ?? DEFAULT_LEASE_ID);
+  const initialId = leases.some((l) => l.id === lease) ? (lease as string) : fallbackId;
+  const template = leases.find((l) => l.id === DEFAULT_LEASE_ID) ?? leases[0] ?? null;
 
   return (
     <section className="relative isolate overflow-hidden">
@@ -43,8 +61,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ l
           </details>
         </div>
 
-        <div className="relative -mx-4 px-4 pb-10 pt-16 lg:mx-0 lg:flex-1 lg:px-0 lg:pb-0 lg:pt-0">
+        <div className="relative -mx-4 space-y-6 px-4 pb-10 pt-16 lg:mx-0 lg:flex-1 lg:px-0 lg:pb-0 lg:pt-0">
           <div aria-hidden className="cautio-split-narrow absolute inset-0 -z-10 bg-primary lg:hidden" />
+          {view === "open" && <OpenLeasePanel template={template} />}
           <LeaseDesk leases={leases} initialId={initialId} />
         </div>
       </div>

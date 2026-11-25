@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LayoutGroup, MotionConfig, motion } from "motion/react";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +47,25 @@ export function LeaseDesk({ leases, initialId }: { leases: Lease[]; initialId: s
     };
   }, []);
 
-  const selected = leases.find((l) => l.id === selectedId) ?? leases[0];
+  const selected: Lease | null = leases.find((l) => l.id === selectedId) ?? leases[0] ?? null;
+
+  if (!selected) {
+    return (
+      <div className="space-y-5">
+        <DeskHeader status={status} />
+        <div className="cautio-enter space-y-3 rounded-sm border-2 border-border bg-background p-6">
+          <h2 className="text-3xl text-foreground">No deposits at the desk yet</h2>
+          <p className="max-w-[52ch] text-sm text-muted-foreground">
+            Lock the first one: the tenant deposits three months of rent in USDG, and neither side can move it alone.
+          </p>
+          <Button asChild>
+            <Link href="/?view=open">Open a new deposit</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const others = leases.filter((l) => l.id !== selected.id);
 
   function open(id: string) {
@@ -58,7 +77,7 @@ export function LeaseDesk({ leases, initialId }: { leases: Lease[]; initialId: s
     <MotionConfig reducedMotion="user">
       <LayoutGroup>
         <div className="space-y-5">
-          <ChainLine status={status} />
+          <DeskHeader status={status} />
 
           <motion.article key={selected.id} layoutId={`lease-${selected.id}`} transition={layoutSpring}>
             <LeaseDetail
@@ -97,6 +116,21 @@ export function LeaseDesk({ leases, initialId }: { leases: Lease[]; initialId: s
         </div>
       </LayoutGroup>
     </MotionConfig>
+  );
+}
+
+function DeskHeader({ status }: { status: VaultStatus }) {
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0 flex-1">
+        <ChainLine status={status} />
+      </div>
+      <Button asChild variant="outline" size="sm" className="self-start">
+        <Link href="/?view=open" scroll={false}>
+          Open a new deposit
+        </Link>
+      </Button>
+    </div>
   );
 }
 
