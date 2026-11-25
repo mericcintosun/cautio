@@ -18,10 +18,11 @@ const buttonVariants = cva(
         link: "border-transparent bg-transparent px-0 normal-case tracking-normal text-foreground underline decoration-2 decoration-primary underline-offset-4 shadow-none hover:translate-x-0 hover:translate-y-0 hover:shadow-none hover:decoration-secondary",
       },
       size: {
-        default: "h-10 px-4",
-        sm: "h-8 px-3 text-xs",
-        lg: "h-12 px-6 text-base",
-        icon: "h-10 w-10",
+        // Every size reaches the 44px touch target (min-h-11 = 2.75rem).
+        default: "min-h-11 px-4",
+        sm: "min-h-11 px-3 text-xs",
+        lg: "min-h-12 px-6 text-base",
+        icon: "h-11 w-11",
       },
     },
     defaultVariants: { variant: "default", size: "default" },

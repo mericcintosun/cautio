@@ -83,3 +83,4 @@ Rules:
 
 ## Amendments (append-only; later phases add dated lines here, never edit anything above)
 - 2026-11-25 (Phase 3): Header action is now the wallet button; still one action.
+- 2026-11-25 (Phase 4): below md the one header link becomes a Menu disclosure listing the three demo entry points; desktop header unchanged.

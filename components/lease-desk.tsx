@@ -123,7 +123,7 @@ export function LeaseDesk({ leases, initialId, source }: { leases: Lease[]; init
 
           <section aria-label="Other deposits at the desk" className="space-y-3">
             <h2 className="text-2xl text-foreground">Other deposits at the desk</h2>
-            <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {others.map((l) => (
                 <motion.li key={l.id} layoutId={`lease-${l.id}`} layout transition={layoutSpring}>
                   <Button
