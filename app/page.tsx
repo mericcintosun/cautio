@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { LeaseDesk } from "@/components/lease-desk";
 import { OpenLeasePanel } from "@/components/open-lease-panel";
 import { SceneSlot } from "@/components/scene-slot";
+import { Button } from "@/components/ui/button";
+import { NavLink } from "@/components/ui/nav-link";
 import { getAdapter } from "@/lib/adapter";
 import { DEFAULT_LEASE_ID } from "@/lib/data";
 
@@ -36,10 +38,14 @@ export default async function Home({ searchParams }: { searchParams: HomeSearch 
         <div className="cautio-stagger space-y-5 lg:sticky lg:top-24 lg:w-[34%] lg:pr-10">
           <h1 className="riso-overprint text-6xl sm:text-7xl">Your deposit, held by neither of you.</h1>
           <p className="max-w-[46ch] text-base">
-            Cautio locks three months of rent in USDG on Arbitrum. At move-out every deduction is its own line with
-            before-and-after photo hashes. If you disagree, both sides seal a final number and the arbiter has to pick
-            one of them.
+            For São Paulo tenants, landlords and the agency in between. Cautio locks three months of rent in USDG on
+            Arbitrum Sepolia. At move-out the landlord lists every deduction as its own line with move-in and move-out
+            photo hashes, the tenant accepts or disputes each one, and on a dispute both sides seal a final number that
+            the arbiter must pick from. Live today: lock, list, answer, seal, pick and settle in one transaction.
           </p>
+          <Button asChild>
+            <NavLink href="/?view=open">Start: lock a deposit</NavLink>
+          </Button>
           <p className="max-w-[46ch] border-l-4 border-primary pl-3 text-sm text-muted-foreground">
             Example loaded: Larissa is leaving Rua Harmonia 302. Accept the cracked window, dispute the paint, seal both
             offers, then let Camila choose.
