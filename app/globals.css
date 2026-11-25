@@ -1,31 +1,41 @@
 @import "tailwindcss";
 
-/* shadcn-style design tokens. The ONLY place colors live: restyle a project by
-   editing these variables from IDENTITY.md; components never carry hex.
-   TEMPLATE placeholder palette: warm neutral, deliberately NOT the navy ground +
-   teal accent the scaffold rules ban, so a token the scaffold forgets to
-   rewrite cannot reintroduce that look. Every value below is replaced. */
+/* Cautio design tokens. Direction D13 riso: two inks (riso-orange, riso-blue) overprinted
+   on off-white stock. Every hex below comes from IDENTITY.md's key block; components
+   reference the tokens, never raw hex. */
 :root {
-  --background: oklch(0.985 0.004 80);
-  --foreground: oklch(0.2 0.01 60);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.01 60);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.01 60);
-  --primary: oklch(0.45 0.12 40);
-  --primary-foreground: oklch(0.98 0.005 80);
-  --secondary: oklch(0.94 0.008 80);
-  --secondary-foreground: oklch(0.25 0.01 60);
-  --muted: oklch(0.94 0.008 80);
-  --muted-foreground: oklch(0.5 0.01 60);
-  --accent: oklch(0.92 0.02 60);
-  --accent-foreground: oklch(0.2 0.01 60);
-  --destructive: oklch(0.55 0.19 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.88 0.01 80);
-  --input: oklch(0.88 0.01 80);
-  --ring: oklch(0.45 0.12 40);
-  --radius: 0.375rem;
+  --riso-stock: #f3efe6;
+  --riso-surface: #e9e4d8;
+  --riso-deep: #ddd7c8;
+  --riso-ink: #1c1b3b;
+  --riso-orange: #ff6a2b;
+  --riso-blue: #2f55d4;
+  --riso-ok: #2e7d4f;
+  --riso-warn: #a8641c;
+  --riso-bad: #b3382c;
+
+  --background: var(--riso-stock);
+  --foreground: var(--riso-ink);
+  --card: var(--riso-surface);
+  --card-foreground: var(--riso-ink);
+  --popover: var(--riso-stock);
+  --popover-foreground: var(--riso-ink);
+  --primary: var(--riso-orange);
+  --primary-foreground: var(--riso-ink);
+  --secondary: var(--riso-blue);
+  --secondary-foreground: var(--riso-stock);
+  --muted: var(--riso-deep);
+  --muted-foreground: color-mix(in oklab, var(--riso-ink) 74%, var(--riso-stock));
+  --accent: var(--riso-deep);
+  --accent-foreground: var(--riso-ink);
+  --destructive: var(--riso-bad);
+  --destructive-foreground: var(--riso-stock);
+  --ok: var(--riso-ok);
+  --warn: var(--riso-warn);
+  --border: var(--riso-ink);
+  --input: var(--riso-ink);
+  --ring: var(--riso-blue);
+  --radius: 0.125rem;
 }
 
 @theme inline {
@@ -45,16 +55,124 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  /* RADIUS sharp: every rounded-* step resolves to at most 0.125rem. */
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: var(--radius);
+  --font-display: var(--font-anton), "Impact", "Haettenschweiler", "Arial Narrow Bold", sans-serif;
+  --font-sans: var(--font-work-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  line-height: 0.95;
+}
+
+@layer components {
+  /* Halftone dot fields: flat ink dots, no gradients of tone. */
+  .riso-halftone {
+    background-image: radial-gradient(var(--riso-ink) 1.1px, transparent 1.7px);
+    background-size: 7px 7px;
+  }
+  .riso-halftone-blue {
+    background-image: radial-gradient(var(--riso-blue) 1.4px, transparent 2px);
+    background-size: 9px 9px;
+  }
+
+  /* Misregistered second plate: a blue outline printed 3px off the shape, multiplied. */
+  .riso-plate {
+    position: relative;
+    isolation: isolate;
+  }
+  .riso-plate::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--riso-blue);
+    transform: translate(3px, 3px);
+    mix-blend-mode: multiply;
+    pointer-events: none;
+  }
+
+  /* Headline overprint: the orange plate sits 3px off the ink. */
+  .riso-overprint {
+    text-shadow: 3px 2px 0 var(--riso-orange);
+  }
+  .riso-overprint-blue {
+    text-shadow: 3px 2px 0 var(--riso-blue);
+  }
+
+  /* L7 diagonal split. Wide screens: one clipped block behind the tool half.
+     Narrow screens: the tool half carries its own slanted top edge. */
+  .cautio-split-wide {
+    clip-path: polygon(46% 0, 100% 0, 100% 100%, 31% 100%);
+  }
+  .cautio-split-narrow {
+    clip-path: polygon(0 56px, 100% 0, 100% 100%, 0 100%);
+  }
+
+  .cautio-fold > summary {
+    cursor: pointer;
+    list-style: none;
+  }
+  .cautio-fold > summary::-webkit-details-marker {
+    display: none;
+  }
+  .cautio-fold > summary::before {
+    content: "+ ";
+    font-weight: 700;
+  }
+  .cautio-fold[open] > summary::before {
+    content: "- ";
+  }
+}
+
+/* MOTION M5 fade: opacity only, linear, 280ms, no transform. */
+@keyframes cautio-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.cautio-enter,
+.cautio-stagger > * {
+  animation: cautio-fade 280ms linear both;
+}
+.cautio-stagger > :nth-child(2) {
+  animation-delay: 70ms;
+}
+.cautio-stagger > :nth-child(3) {
+  animation-delay: 140ms;
+}
+.cautio-stagger > :nth-child(4) {
+  animation-delay: 210ms;
+}
+.cautio-stagger > :nth-child(n + 5) {
+  animation-delay: 280ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cautio-enter,
+  .cautio-stagger > * {
+    animation: none;
+  }
 }
