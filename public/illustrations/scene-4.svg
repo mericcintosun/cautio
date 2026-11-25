@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 500" width="1200" height="500">
+  <defs>
+    <pattern id="bluedots" width="12" height="12" patternUnits="userSpaceOnUse">
+      <circle cx="6" cy="6" r="2.6" fill="#2f55d4"/>
+    </pattern>
+    <pattern id="inkdots" width="9" height="9" patternUnits="userSpaceOnUse">
+      <circle cx="4.5" cy="4.5" r="1.6" fill="#1c1b3b"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="500" fill="#f3efe6"/>
+  <polygon points="0,500 0,380 1200,300 1200,500" fill="url(#inkdots)" opacity="0.2"/>
+  <rect x="80" y="200" width="150" height="70" fill="#e9e4d8" stroke="#1c1b3b" stroke-width="7"/>
+  <circle cx="155" cy="150" r="50" fill="none" stroke="#1c1b3b" stroke-width="12"/>
+  <circle cx="158" cy="153" r="50" fill="none" stroke="#2f55d4" stroke-width="5" style="mix-blend-mode:multiply"/>
+  <rect x="145" y="196" width="20" height="150" fill="#1c1b3b"/>
+  <rect x="165" y="300" width="36" height="16" fill="#1c1b3b"/>
+  <rect x="165" y="326" width="26" height="16" fill="#1c1b3b"/>
+  <rect x="300" y="300" width="200" height="34" fill="#ff6a2b"/>
+  <rect x="300" y="262" width="200" height="34" fill="#ff6a2b"/>
+  <rect x="300" y="224" width="200" height="34" fill="#ff6a2b"/>
+  <rect x="297" y="221" width="200" height="113" fill="none" stroke="#1c1b3b" stroke-width="6"/>
+  <rect x="300" y="224" width="200" height="113" fill="none" stroke="#2f55d4" stroke-width="3" style="mix-blend-mode:multiply"/>
+  <polyline points="560,280 520,280" fill="none" stroke="#1c1b3b" stroke-width="8"/>
+  <polygon points="250,280 290,255 290,305" fill="#1c1b3b"/>
+  <line x1="290" y1="280" x2="296" y2="280" stroke="#1c1b3b" stroke-width="8"/>
+  <rect x="560" y="120" width="60" height="260" fill="#1c1b3b"/>
+  <rect x="640" y="340" width="300" height="34" fill="#2f55d4" style="mix-blend-mode:multiply"/>
+  <rect x="640" y="302" width="300" height="34" fill="#2f55d4" style="mix-blend-mode:multiply"/>
+  <rect x="640" y="264" width="300" height="34" fill="#2f55d4" style="mix-blend-mode:multiply"/>
+  <rect x="640" y="226" width="300" height="34" fill="#2f55d4" style="mix-blend-mode:multiply"/>
+  <rect x="640" y="188" width="300" height="34" fill="#2f55d4" style="mix-blend-mode:multiply"/>
+  <rect x="637" y="185" width="300" height="189" fill="none" stroke="#1c1b3b" stroke-width="6"/>
+  <polygon points="1000,280 960,255 960,305" fill="#1c1b3b"/>
+  <rect x="1010" y="230" width="150" height="150" fill="#e9e4d8"/>
+  <rect x="1013" y="233" width="150" height="150" fill="url(#bluedots)" style="mix-blend-mode:multiply"/>
+  <rect x="1010" y="230" width="150" height="150" fill="none" stroke="#1c1b3b" stroke-width="7"/>
+  <polygon points="1010,230 985,195 1060,195 1085,230" fill="#e9e4d8" stroke="#1c1b3b" stroke-width="6"/>
+  <polygon points="1160,230 1185,195 1110,195 1085,230" fill="#e9e4d8" stroke="#1c1b3b" stroke-width="6"/>
+  <rect x="1060" y="230" width="50" height="150" fill="#ff6a2b" style="mix-blend-mode:multiply"/>
+  <rect x="80" y="420" width="1080" height="14" fill="#1c1b3b"/>
+</svg>
