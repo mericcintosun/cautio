@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 640" width="960" height="640">
+  <defs>
+    <pattern id="dots" width="12" height="12" patternUnits="userSpaceOnUse">
+      <circle cx="6" cy="6" r="2.6" fill="#2f55d4"/>
+    </pattern>
+    <pattern id="inkdots" width="9" height="9" patternUnits="userSpaceOnUse">
+      <circle cx="4.5" cy="4.5" r="1.6" fill="#1c1b3b"/>
+    </pattern>
+  </defs>
+  <rect width="960" height="640" fill="#f3efe6"/>
+  <polygon points="0,640 0,420 960,250 960,640" fill="url(#dots)" style="mix-blend-mode:multiply"/>
+  <rect x="96" y="70" width="300" height="520" fill="#e9e4d8"/>
+  <rect x="104" y="76" width="300" height="520" fill="none" stroke="#2f55d4" stroke-width="6" style="mix-blend-mode:multiply"/>
+  <rect x="96" y="70" width="300" height="520" fill="none" stroke="#1c1b3b" stroke-width="8"/>
+  <rect x="136" y="120" width="220" height="170" fill="none" stroke="#1c1b3b" stroke-width="6"/>
+  <rect x="136" y="330" width="220" height="210" fill="url(#inkdots)" opacity="0.35"/>
+  <circle cx="352" cy="352" r="12" fill="#1c1b3b"/>
+  <text x="246" y="216" font-family="Impact, Arial Narrow, sans-serif" font-size="72" fill="#1c1b3b" text-anchor="middle">302</text>
+  <rect x="500" y="250" width="340" height="250" fill="#ff6a2b" style="mix-blend-mode:multiply"/>
+  <rect x="490" y="242" width="340" height="250" fill="none" stroke="#1c1b3b" stroke-width="8"/>
+  <line x1="490" y1="320" x2="830" y2="320" stroke="#1c1b3b" stroke-width="6"/>
+  <path d="M590 250 V200 a40 40 0 0 1 80 0 V250" fill="none" stroke="#2f55d4" stroke-width="14" style="mix-blend-mode:multiply"/>
+  <rect x="566" y="240" width="128" height="100" fill="#2f55d4" style="mix-blend-mode:multiply"/>
+  <rect x="560" y="236" width="128" height="100" fill="none" stroke="#1c1b3b" stroke-width="6"/>
+  <path d="M700 250 V196 a40 40 0 0 1 80 0 V250" fill="none" stroke="#ff6a2b" stroke-width="14"/>
+  <rect x="676" y="240" width="128" height="100" fill="#ff6a2b"/>
+  <rect x="670" y="236" width="128" height="100" fill="none" stroke="#1c1b3b" stroke-width="6"/>
+  <circle cx="624" cy="280" r="10" fill="#1c1b3b"/>
+  <circle cx="734" cy="280" r="10" fill="#1c1b3b"/>
+  <path d="M396 360 C440 360 450 420 500 420" fill="none" stroke="#1c1b3b" stroke-width="5"/>
+  <circle cx="470" cy="408" r="22" fill="none" stroke="#1c1b3b" stroke-width="6"/>
+  <rect x="440" y="430" width="16" height="64" fill="#1c1b3b" transform="rotate(-20 448 462)"/>
+  <rect x="490" y="560" width="350" height="16" fill="#1c1b3b"/>
+</svg>
