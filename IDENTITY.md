@@ -84,3 +84,5 @@ Rules:
 ## Amendments (append-only; later phases add dated lines here, never edit anything above)
 - 2026-11-25 (Phase 3): Header action is now the wallet button; still one action.
 - 2026-11-25 (Phase 4): below md the one header link becomes a Menu disclosure listing the three demo entry points; desktop header unchanged.
+- 2026-11-25 (Phase 5): header no-wallet state is a status badge in the action slot; diagonal clip-path tracks lease phase; scene slots 1-6 placed.
+- 2026-11-25 (Phase 5): header treatment confirmed: solid ground, border-b LINE, sticky.

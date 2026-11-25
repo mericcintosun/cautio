@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LayoutGroup, MotionConfig, motion } from "motion/react";
 import { DeskEmptyState } from "@/components/desk-states";
+import { useReportDeskPhase } from "@/components/diagonal-split";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LeaseDetail, initFlow, leaseSignature, type Flow } from "@/components/lease-detail";
@@ -79,6 +80,9 @@ export function LeaseDesk({ leases, initialId, source }: { leases: Lease[]; init
 
   const selected: Lease | null = leases.find((l) => l.id === selectedId) ?? leases[0] ?? null;
 
+  // The diagonal behind the desk (components/diagonal-split.tsx) follows the open lease's phase.
+  useReportDeskPhase(selected ? flowOf(selected).phase : null);
+
   // Tell the header which lease is open, so the wallet button can show this wallet's role.
   useEffect(() => {
     setFocus(
@@ -122,7 +126,7 @@ export function LeaseDesk({ leases, initialId, source }: { leases: Lease[]; init
           </motion.article>
 
           <section aria-label="Other deposits at the desk" className="space-y-3">
-            <h2 className="text-2xl text-foreground">Other deposits at the desk</h2>
+            <h2 className="text-3xl text-foreground">Other deposits at the desk</h2>
             <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {others.map((l) => (
                 <motion.li key={l.id} layoutId={`lease-${l.id}`} layout transition={layoutSpring}>
@@ -202,7 +206,7 @@ function ChainLine({ status, source }: { status: VaultStatus; source: DataSource
     text = `Arbitrum Sepolia block ${status.block.toLocaleString("en-US")}, read live. No vault address configured yet, so every write is simulated.`;
   }
   return (
-    <div aria-live="polite" className="space-y-px border-l-4 border-secondary bg-background px-3 py-2 text-xs text-foreground">
+    <div aria-live="polite" className="riso-plate space-y-px border-2 border-l-4 border-border border-l-secondary bg-card px-3 py-2 text-xs text-foreground">
       <p className="font-semibold">{sourceText}</p>
       <p>{text}</p>
     </div>

@@ -37,34 +37,45 @@ const compared = [
   ["Kleros Escrow, Trustless Work", "General escrow", "Not rent specific", "General jury or approver", "Not rent specific"],
 ] as const;
 
+const runs = [
+  [
+    "DepositVault",
+    "One Solidity contract on Arbitrum Sepolia (chain 421614) with an explicit state machine, a reentrancy guard and a measured deposit; settle pays both sides in one transaction.",
+  ],
+  [
+    "Paxos USDG",
+    "The vault's only token is IUSDG: _payOut asks _isFrozen() before paying anyone, a frozen share waits in owed for withdraw(), and the browser approves exactly the deposit on token(). Testnet runs on MockUSDG with the same surface.",
+  ],
+  [
+    "In the browser",
+    "viem reads the chain and computes the exact commit hash the contract checks, and Web Crypto hashes photos so the photo never leaves your device.",
+  ],
+] as const;
+
 export default function AboutPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-16 px-4 py-12 lg:px-8">
       <header className="cautio-enter grid gap-8 md:grid-cols-[1.1fr_0.9fr] md:items-end">
         <div className="space-y-4">
-          <h1 className="riso-overprint-blue text-6xl sm:text-7xl">A deposit nobody can quietly keep.</h1>
+          <h1 className="riso-overprint-blue text-5xl sm:text-6xl lg:text-7xl">A deposit nobody can quietly keep.</h1>
           <p className="max-w-[65ch] text-base">
-            Cautio is for the São Paulo tenant waiting on three months of rent after handing back the keys, and for the
-            small agency that wants to run deposits fairly across a few hundred leases. The money sits in a contract.
-            Deductions are itemized and backed by photos. Disagreements end with one of two sealed numbers, picked by
-            someone both sides named on day one.
+            Cautio keeps a São Paulo tenant&apos;s three months of rent in a contract, itemizes every deduction with photos,
+            and ends a disagreement with one of two sealed numbers picked by someone both sides named on day one.
           </p>
         </div>
-        <SceneSlot
-          n={2}
-          alt="Two photo prints side by side of the same bedroom window, the left one intact and the right one with a diagonal crack, each stamped with a hash check mark"
-          width={960}
-          height={640}
-          className="border-2 border-border"
-        />
+        <SceneSlot n={6} alt="A riso print of a São Paulo apartment block with one window cut diagonally into orange and blue halves" width={960} height={640} className="border-2 border-border" />
       </header>
 
       {VAULT_ADDRESS === null && <VaultEmptyState />}
 
-      <section className="space-y-6">
-        <h2 className="text-4xl">The move-out problem</h2>
-        <details className="cautio-fold max-w-[70ch]">
-          <summary className="font-semibold">One lump sum, no line items, no one to appeal to.</summary>
+      <section className="space-y-4">
+        <h2 className="text-3xl">The move-out problem</h2>
+        <p className="max-w-[65ch]">
+          Today the landlord keeps the caução in a personal account and announces one lump sum at move-out, with nothing to
+          contest line by line.
+        </p>
+        <details className="cautio-fold max-w-[65ch]">
+          <summary className="font-semibold">Why it ends in court, in two paragraphs</summary>
           <div className="mt-3 space-y-3 text-muted-foreground">
             <p>
               In Brazil a cash caução is capped at three months of rent and is supposed to sit in an account tied to the
@@ -81,11 +92,13 @@ export default function AboutPage() {
       </section>
 
       <section className="space-y-6">
-        <h2 className="text-4xl">How a deposit moves through the vault</h2>
+        <h2 className="text-3xl">How a deposit moves through the vault</h2>
+        <p className="max-w-[65ch]">Six phases, each one a DepositVault state that only the right wallet can advance.</p>
         <ol className="cautio-stagger grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {phases.map(([name, text], i) => (
             <li key={name}>
               <Card className="h-full">
+                <div aria-hidden className={i % 2 === 0 ? "riso-halftone h-3 border-b-2 border-border" : "riso-halftone-blue h-3 border-b-2 border-border"} />
                 <CardHeader>
                   <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Phase {i + 1}</p>
                   <CardTitle>{name}</CardTitle>
@@ -97,27 +110,16 @@ export default function AboutPage() {
         </ol>
       </section>
 
-      <section className="grid gap-8 md:grid-cols-[0.9fr_1.1fr] md:items-start">
-        <SceneSlot
-          n={3}
-          alt="Two sealed envelopes with wax seals, one orange and one blue, and an agent's hand lifting only the blue envelope"
-          width={960}
-          height={640}
-          className="border-2 border-border"
-        />
-        <div className="space-y-4">
-          <h2 className="text-4xl">Final-offer arbitration, sealed</h2>
-          <p className="max-w-[65ch]">
-            Baseball salary arbitration has a simple rule: the arbiter cannot split the difference, only pick one side&apos;s
-            number. That rule pulls both offers toward fair, because an extreme number loses whole. Cautio puts it on chain
-            with commit-reveal, so neither side can wait to see the other&apos;s number first. The arbiter is named when the
-            deposit is locked, usually the agency that wrote the lease.
-          </p>
-          <div className="overflow-x-auto">
+      <section className="space-y-4">
+        <h2 className="text-3xl">Final-offer arbitration, sealed</h2>
+        <p className="max-w-[65ch]">
+          The arbiter cannot split the difference, only pick one side&apos;s sealed number, so an extreme offer loses whole and
+          both sides offer something close to fair.
+        </p>
+        <details className="cautio-fold max-w-[65ch]">
+          <summary className="font-semibold">Timeout table: Five ways to go quiet, five outcomes</summary>
+          <div className="mt-3 overflow-x-auto">
             <table className="w-full border-2 border-border text-left text-sm">
-              <caption className="pb-2 text-left text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                Every waiting step has a deadline. Silence loses.
-              </caption>
               <thead className="bg-muted">
                 <tr>
                   <th className="border-b-2 border-border px-3 py-2">If this happens</th>
@@ -134,80 +136,58 @@ export default function AboutPage() {
               </tbody>
             </table>
           </div>
-        </div>
+        </details>
       </section>
 
       <section className="space-y-6">
-        <h2 className="text-4xl">What runs on Arbitrum</h2>
+        <h2 className="text-3xl">What runs on Arbitrum</h2>
+        <p className="max-w-[65ch]">One contract holds the money, one stablecoin carries it, and the browser does the hashing.</p>
         <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>DepositVault</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p>
-                One Solidity contract on Arbitrum Sepolia (chain 421614) with an explicit state machine, custom errors,
-                a reentrancy guard and checks-effects-interactions on every payout. openLease measures the USDG it pulls
-                in, and settle pays both sides in one transaction.
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Paxos USDG</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p>
-                Deposits are denominated in USDG through the vault&apos;s IUSDG interface. Before paying anyone, _payOut
-                asks _isFrozen(), which calls USDG&apos;s isFrozen(). A frozen recipient&apos;s share is held in owed and
-                pulled later with withdraw(), so one frozen wallet cannot block the other side&apos;s refund. The browser
-                approves exactly the deposit on token() before openLease. Testnet runs on MockUSDG with the same surface.
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>In the browser</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p>
-                viem reads the chain over the public RPC and computes the exact commit hash the contract checks. Photo
-                hashes are SHA-256 from Web Crypto, so the photo itself never leaves your device.
-              </p>
-            </CardContent>
-          </Card>
+          {runs.map(([title, text], i) => (
+            <Card key={title}>
+              <div aria-hidden className={i === 1 ? "riso-halftone-blue h-3 border-b-2 border-border" : "riso-halftone h-3 border-b-2 border-border"} />
+              <CardHeader>
+                <CardTitle>{title}</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm">{text}</CardContent>
+            </Card>
+          ))}
         </div>
       </section>
 
-      <section className="space-y-6">
-        <h2 className="text-4xl">Compared with</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] border-2 border-border text-left text-sm">
-            <thead className="bg-muted">
-              <tr>
-                {["Product", "Rails", "Deductions", "Disputes", "Silent landlord"].map((h) => (
-                  <th key={h} className="border-b-2 border-border px-3 py-2">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {compared.map((row) => (
-                <tr key={row[0]} className="border-b border-border">
-                  {row.map((cell, i) => (
-                    <td key={i} className={i === 0 ? "px-3 py-2 font-semibold" : "px-3 py-2"}>
-                      {cell}
-                    </td>
+      <section className="space-y-4">
+        <h2 className="text-3xl">Compared with</h2>
+        <p className="max-w-[65ch]">No rent deposit product we found splits deductions per item and settles disputes with sealed final offers.</p>
+        <details className="cautio-fold">
+          <summary className="font-semibold">Comparison table: Cautio, Rentible, RentSafe, Kleros Escrow and Trustless Work</summary>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[720px] border-2 border-border text-left text-sm">
+              <thead className="bg-muted">
+                <tr>
+                  {["Product", "Rails", "Deductions", "Disputes", "Silent landlord"].map((h) => (
+                    <th key={h} className="border-b-2 border-border px-3 py-2">
+                      {h}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="max-w-[65ch] text-xs text-muted-foreground">
-          Based on each project&apos;s public docs as of November 2026. Tell us if we got one wrong.
-        </p>
+              </thead>
+              <tbody>
+                {compared.map((row) => (
+                  <tr key={row[0]} className="border-b border-border">
+                    {row.map((cell, i) => (
+                      <td key={i} className={i === 0 ? "px-3 py-2 font-semibold" : "px-3 py-2"}>
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 max-w-[65ch] text-xs text-muted-foreground">
+            Based on each project&apos;s public docs as of November 2026. Tell us if we got one wrong.
+          </p>
+        </details>
       </section>
 
       <div className="flex flex-wrap items-center gap-4 border-t-2 border-border pt-8">

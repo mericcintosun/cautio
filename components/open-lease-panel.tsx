@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Hex } from "viem";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { FileInput } from "@/components/ui/file-input";
 import { Input } from "@/components/ui/input";
 import { NavLink } from "@/components/ui/nav-link";
 import { TxIntent } from "@/components/tx-intent";
@@ -212,7 +213,7 @@ export function OpenLeasePanel({ template }: { template: Lease | null }) {
             />
           </Field>
           <Field id={`${ids}-photo`} label="Move-in photo (hashed in your browser, never uploaded)">
-            <Input id={`${ids}-photo`} type="file" accept="image/*" onChange={onPhoto} />
+            <FileInput id={`${ids}-photo`} accept="image/*" onChange={onPhoto} />
           </Field>
           {photo.kind === "hashing" && <p className="text-xs text-muted-foreground">Hashing…</p>}
           {photo.kind === "hashed" && (

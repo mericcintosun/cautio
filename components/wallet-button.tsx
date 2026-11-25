@@ -24,9 +24,22 @@ export function WalletButton() {
 
   switch (state.kind) {
     case "disconnected":
+      // No injected wallet: the action slot becomes a status, not a dead button.
+      if (!hasProvider) {
+        return (
+          <Badge
+            variant="outline"
+            role="status"
+            title="No browser wallet found, so every write is simulated"
+            className="min-h-11 max-w-[8rem] whitespace-normal text-center leading-tight text-foreground sm:max-w-none sm:whitespace-nowrap"
+          >
+            No wallet: writes simulated
+          </Badge>
+        );
+      }
       return (
-        <Button size="sm" disabled={!hasProvider} onClick={() => void connect()} title={hasProvider ? undefined : "No browser wallet found, so every write is simulated"}>
-          {hasProvider ? "Connect wallet" : "Writes simulated"}
+        <Button size="sm" onClick={() => void connect()}>
+          Connect wallet
         </Button>
       );
     case "connecting":

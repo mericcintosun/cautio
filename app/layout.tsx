@@ -27,6 +27,8 @@ export const metadata: Metadata = {
 };
 
 const SOURCE_URL = "https://github.com/mericcintosun/cautio";
+const HACKATHON_URL = "https://www.hackquest.io/hackathons/Arbitrum-Open-House-Sao-Paulo-Online-Buildathon";
+const FOOT_LINK = "font-semibold underline decoration-primary decoration-2 underline-offset-2 hover:decoration-secondary";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -38,13 +40,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <NavLink
               href="/"
               aria-label="Cautio, lease desk"
-              className="flex min-h-11 items-center gap-2.5 font-display text-2xl uppercase tracking-wide decoration-2 underline-offset-8"
+              className="flex min-h-11 shrink-0 items-center gap-2 font-display uppercase tracking-wide decoration-2 underline-offset-8 sm:gap-2.5"
               activeClassName="underline decoration-secondary"
             >
               <BrandMark size={30} />
-              <span className="sr-only sm:not-sr-only">Cautio</span>
+              <span className="text-xl sm:text-2xl">Cautio</span>
             </NavLink>
-            <nav className="flex items-center gap-2 sm:gap-4">
+            <nav className="flex min-w-0 items-center gap-2 sm:gap-4">
               <NavLink
                 href="/about"
                 className="hidden text-sm font-semibold underline decoration-primary decoration-2 underline-offset-4 hover:decoration-secondary md:inline-flex"
@@ -58,40 +60,35 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
         <main className="flex-1">{children}</main>
-        <footer className="border-t-2 border-border">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-5 text-xs text-muted-foreground lg:px-8">
-            <p>Deposits held by DepositVault on Arbitrum Sepolia, denominated in USDG.</p>
-            <p>Built for Arbitrum Open House São Paulo.</p>
-          </div>
-          <div
-            aria-label="About and security"
-            className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-1 border-t-2 border-dashed border-border px-4 py-3 text-xs text-muted-foreground lg:px-8"
-          >
-            <p className="font-semibold uppercase tracking-wider text-foreground">About and security</p>
-            <p className="flex min-w-0 items-center gap-1">
-              <span>DepositVault</span>
-              {VAULT_ADDRESS ? (
-                <ShortHex value={VAULT_ADDRESS} href={`${EXPLORER}/address/${VAULT_ADDRESS}`} />
-              ) : (
-                <span>not deployed in this build</span>
-              )}
-            </p>
-            <p>Arbitrum Sepolia, chain id {CHAIN_ID}</p>
-            <p>
-              <a
-                href={SOURCE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline decoration-primary decoration-2 underline-offset-2 hover:decoration-secondary"
-              >
-                Source on GitHub
-              </a>
-            </p>
-            <p>
-              <Link href="/about" className="underline decoration-primary decoration-2 underline-offset-2 hover:decoration-secondary">
-                How it works
-              </Link>
-            </p>
+        <footer className="border-t-2 border-border bg-card">
+          <div className="mx-auto max-w-7xl space-y-2 px-4 py-5 text-xs text-foreground lg:px-8">
+            <ul aria-label="About and security" className="flex flex-wrap items-center gap-x-5 gap-y-2">
+              <li>
+                <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer" className={FOOT_LINK}>
+                  Source on GitHub
+                </a>
+              </li>
+              <li>
+                <a href={HACKATHON_URL} target="_blank" rel="noopener noreferrer" className={FOOT_LINK}>
+                  Hackathon page
+                </a>
+              </li>
+              <li>
+                <Link href="/about" className={FOOT_LINK}>
+                  How it works
+                </Link>
+              </li>
+              <li className="flex min-w-0 items-center gap-1">
+                <span>DepositVault</span>
+                {VAULT_ADDRESS ? (
+                  <ShortHex value={VAULT_ADDRESS} href={`${EXPLORER}/address/${VAULT_ADDRESS}`} />
+                ) : (
+                  <span>not deployed in this build</span>
+                )}
+              </li>
+              <li>Chain id {CHAIN_ID}</li>
+            </ul>
+            <p className="text-muted-foreground">Built for Arbitrum Open House São Paulo.</p>
           </div>
         </footer>
         </WalletProvider>
