@@ -33,7 +33,7 @@ export function TxStatus({ state }: { state: WalletState }) {
           ) : (
             <>
               confirmed on Arbitrum Sepolia ·{" "}
-              <a className="underline decoration-primary decoration-2" href={`${EXPLORER}/tx/${state.hash}`} target="_blank" rel="noreferrer">
+              <a className="underline decoration-primary decoration-2" href={`${EXPLORER}/tx/${state.hash}`} target="_blank" rel="noopener noreferrer">
                 {shortHex(state.hash, 10, 6)} on Arbiscan
               </a>
             </>
