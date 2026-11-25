@@ -1,0 +1,121 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { LayoutGroup, MotionConfig, motion } from "motion/react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { LeaseDetail, initFlow, type Flow } from "@/components/lease-detail";
+import { PHASE_LABEL, formatUsdg, shortHex, type Lease, type Phase } from "@/lib/data";
+import { readVaultStatus, type VaultStatus } from "@/lib/vault";
+
+const layoutSpring = { type: "spring", stiffness: 420, damping: 38 } as const;
+
+const phaseTone: Record<Phase, "default" | "secondary" | "outline" | "ok" | "warn"> = {
+  Active: "outline",
+  MoveOut: "warn",
+  Itemized: "default",
+  Sealed: "secondary",
+  Revealed: "secondary",
+  Ruled: "default",
+  Settled: "ok",
+};
+
+/**
+ * The lease desk: every deposit an agency holds, one of them open.
+ * Signature interaction (K1 #1): a lease cell grows into the detail view through a
+ * shared layoutId, and the detail shrinks back into its cell when another lease opens.
+ */
+export function LeaseDesk({ leases, initialId }: { leases: Lease[]; initialId: string }) {
+  const router = useRouter();
+  const [selectedId, setSelectedId] = useState(initialId);
+  const [flows, setFlows] = useState<Record<string, Flow>>(() =>
+    Object.fromEntries(leases.map((l) => [l.id, initFlow(l)]))
+  );
+  const [status, setStatus] = useState<VaultStatus>({ kind: "loading" });
+
+  useEffect(() => setSelectedId(initialId), [initialId]);
+
+  useEffect(() => {
+    let alive = true;
+    readVaultStatus().then((s) => {
+      if (alive) setStatus(s);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const selected = leases.find((l) => l.id === selectedId) ?? leases[0];
+  const others = leases.filter((l) => l.id !== selected.id);
+
+  function open(id: string) {
+    setSelectedId(id);
+    router.replace(`/?lease=${id}`, { scroll: false });
+  }
+
+  return (
+    <MotionConfig reducedMotion="user">
+      <LayoutGroup>
+        <div className="space-y-5">
+          <ChainLine status={status} />
+
+          <motion.article key={selected.id} layoutId={`lease-${selected.id}`} transition={layoutSpring}>
+            <LeaseDetail
+              lease={selected}
+              flow={flows[selected.id]}
+              onChange={(next) => setFlows((f) => ({ ...f, [selected.id]: next }))}
+            />
+          </motion.article>
+
+          <section aria-label="Other deposits at the desk" className="space-y-3">
+            <h2 className="text-2xl text-foreground">Other deposits at the desk</h2>
+            <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {others.map((l) => (
+                <motion.li key={l.id} layoutId={`lease-${l.id}`} layout transition={layoutSpring}>
+                  <Button
+                    variant="outline"
+                    onClick={() => open(l.id)}
+                    className="h-auto w-full flex-col items-start gap-1.5 whitespace-normal p-3 text-left normal-case tracking-normal"
+                    aria-label={`Open ${l.street}`}
+                  >
+                    <span className="flex w-full items-center justify-between gap-2">
+                      <span className="text-[0.68rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                        {l.neighborhood}
+                      </span>
+                      <Badge variant={phaseTone[flows[l.id].phase]}>{PHASE_LABEL[flows[l.id].phase]}</Badge>
+                    </span>
+                    <span className="font-display text-lg uppercase leading-tight">{l.street}</span>
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {formatUsdg(l.deposit)} · {l.tenant.name} and {l.landlord.name}
+                    </span>
+                  </Button>
+                </motion.li>
+              ))}
+            </ul>
+          </section>
+        </div>
+      </LayoutGroup>
+    </MotionConfig>
+  );
+}
+
+function ChainLine({ status }: { status: VaultStatus }) {
+  let text: string;
+  if (status.kind === "loading") {
+    text = "Reading Arbitrum Sepolia…";
+  } else if (status.kind === "offline") {
+    text = `Arbitrum Sepolia RPC did not answer (${status.reason}). Showing seed deposits, actions simulated.`;
+  } else if (status.vault) {
+    text = `Arbitrum Sepolia block ${status.block.toLocaleString("en-US")}. Vault ${shortHex(status.vault)} holds ${String(
+      status.leaseCount ?? 0n
+    )} leases on chain; the desk below still shows seed deposits.`;
+  } else {
+    text = `Arbitrum Sepolia block ${status.block.toLocaleString("en-US")}, read live. No vault address configured yet, so these are seed deposits and every write is simulated.`;
+  }
+  return (
+    <p aria-live="polite" className="border-l-4 border-secondary bg-background px-3 py-2 text-xs text-foreground">
+      {text}
+    </p>
+  );
+}
