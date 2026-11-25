@@ -4,38 +4,48 @@ pragma solidity ^0.8.20;
 /// @title MockUSDG
 /// @notice Testnet stand-in for Paxos USDG with the same surface DepositVault uses:
 /// ERC-20 with 6 decimals plus `isFrozen`. Transfers from or to a frozen account
-/// revert, matching USDG's compliance freeze. Anyone may mint up to 10,000 per call
-/// so demo wallets can fund a deposit. Swap for the real USDG address when one is
-/// confirmed on the target chain; DepositVault takes the token in its constructor.
+/// revert, matching USDG's compliance freeze. Swap for the real USDG address when one
+/// is confirmed on the target chain; DepositVault takes the token in its constructor.
 contract MockUSDG {
     string public constant name = "Mock Global Dollar";
     string public constant symbol = "USDG";
     uint8 public constant decimals = 6;
-    uint256 public constant MINT_CAP = 10_000e6;
 
-    address public immutable freezer;
+    /// @notice Per-call mint cap of 10,000 USDG. `mint` is an open testnet faucet so any
+    /// demo wallet can fund a deposit; the cap keeps one call from minting a supply
+    /// large enough to overflow balances or make the demo numbers meaningless.
+    uint256 public constant MAX_MINT = 10_000e6;
+
+    /// @notice The deployer. Only the owner may freeze or unfreeze an account, as only
+    /// Paxos can on the real token.
+    address public immutable owner;
+
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
     mapping(address => bool) public isFrozen;
 
+    error NotOwner();
+    error MintCapExceeded();
+
     event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(address indexed owner, address indexed spender, uint256 value);
+    event Approval(address indexed holder, address indexed spender, uint256 value);
     event FreezeChanged(address indexed account, bool frozen);
 
     constructor() {
-        freezer = msg.sender;
+        owner = msg.sender;
     }
 
+    /// @notice Open testnet faucet, at most MAX_MINT per call.
     function mint(address to, uint256 amount) external {
-        require(amount <= MINT_CAP, "cap");
+        if (amount > MAX_MINT) revert MintCapExceeded();
         totalSupply += amount;
         balanceOf[to] += amount;
         emit Transfer(address(0), to, amount);
     }
 
     function setFrozen(address account, bool frozen) external {
-        require(msg.sender == freezer, "not freezer");
+        if (msg.sender != owner) revert NotOwner();
         isFrozen[account] = frozen;
         emit FreezeChanged(account, frozen);
     }

@@ -6,7 +6,6 @@ import {MockUSDG} from "../src/MockUSDG.sol";
 
 interface Vm {
     function envUint(string calldata name) external view returns (uint256);
-    function envOr(string calldata name, address defaultValue) external view returns (address);
     function startBroadcast(uint256 privateKey) external;
     function stopBroadcast() external;
 }
@@ -15,8 +14,10 @@ interface Console {
     function log(string calldata label, address value) external view;
 }
 
-/// Deploys DepositVault on the target chain. If USDG_ADDRESS is set, the vault uses
-/// that token (real Paxos USDG); otherwise it deploys MockUSDG first.
+/// Deploys MockUSDG and a DepositVault that uses it. No official USDG exists on
+/// Arbitrum Sepolia, so this script always deploys the mock. To point a vault at an
+/// existing token instead, use script/DeployWithUsdg.s.sol.
+/// Reads only PRIVATE_KEY.
 ///   PRIVATE_KEY=$FARM_EVM_PRIVATE_KEY forge script script/Deploy.s.sol --rpc-url $RPC_URL --broadcast
 contract Deploy {
     Vm constant vm = Vm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
@@ -24,16 +25,13 @@ contract Deploy {
 
     function run() external returns (DepositVault vault) {
         uint256 pk = vm.envUint("PRIVATE_KEY");
-        address usdg = vm.envOr("USDG_ADDRESS", address(0));
 
         vm.startBroadcast(pk);
-        if (usdg == address(0)) {
-            usdg = address(new MockUSDG());
-        }
-        vault = new DepositVault(IUSDG(usdg));
+        MockUSDG usdg = new MockUSDG();
+        vault = new DepositVault(IUSDG(address(usdg)));
         vm.stopBroadcast();
 
-        console.log("USDG token:", usdg);
+        console.log("USDG token:", address(usdg));
         console.log("DepositVault deployed at:", address(vault));
     }
 }
