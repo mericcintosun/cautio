@@ -5,7 +5,7 @@
 - Live: https://cautio-beta.vercel.app
 - Click: DEMO step 2, `/?lease=rua-harmonia-302`
 
-**Real or simulated on the live URL.** The status line above the desk says which. While it reads "Sample data: DepositVault address is not configured", the desk shows the ten seeded leases and every write is simulated in the browser; the block number under it is still a real Arbitrum Sepolia read. Once a vault is deployed it reads "Live: DepositVault 0x… on Arbitrum Sepolia, block N" and the two anchor leases sign real DepositVault transactions.
+**Real or simulated on the live URL.** The status line above the desk says which. While it reads "Sample leases shown: DepositVault is not deployed in this build yet", the desk shows the ten seeded leases and every write is simulated in the browser; the block number under it is still a real Arbitrum Sepolia read. Once a vault is deployed it reads "Live: DepositVault 0x… on Arbitrum Sepolia, block N" and the two anchor leases sign real DepositVault transactions.
 
 ### Try it in 60 seconds
 
@@ -126,7 +126,7 @@ Written by `npm run proof`. Each block says plainly when it has not run.
 **Chain read**
 
 <!-- PROOF:BEGIN chain-read -->
-Arbitrum Sepolia (421614) block 332587066 read in 322 ms on 2026-11-25T11:45:02.427Z.
+Arbitrum Sepolia (421614) block 332587939 read in 265 ms on 2026-11-25T11:49:22.443Z.
 
 Not run in this build: NEXT_PUBLIC_CONTRACT_ADDRESS is not configured.
 <!-- PROOF:END chain-read -->
@@ -135,11 +135,11 @@ Not run in this build: NEXT_PUBLIC_CONTRACT_ADDRESS is not configured.
 
 <!-- PROOF:BEGIN forge-test -->
 ```
-Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 150.62ms (164.65ms CPU time)
-Ran 1 test suite in 153.16ms (150.62ms CPU time): 12 tests passed, 0 failed, 0 skipped (12 total tests)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 103.78ms (107.87ms CPU time)
+Ran 1 test suite in 104.62ms (103.78ms CPU time): 12 tests passed, 0 failed, 0 skipped (12 total tests)
 ```
 
-`forge test` in contracts/, exit code 0, 2026-11-25T11:45:03.025Z.
+`forge test` in contracts/, exit code 0, 2026-11-25T11:49:22.910Z.
 <!-- PROOF:END forge-test -->
 
 **Demo state (anchor leases)**

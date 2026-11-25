@@ -16,6 +16,6 @@ export const fakeAdapter: CautioAdapter = {
     return found ? copy(found) : null;
   },
   async describe(): Promise<DataSource> {
-    return { kind: "seed", reason: "Sample data: seed leases from lib/data/seed.ts" };
+    return { kind: "seed", reason: "Sample leases shown: this build runs on the seeded desk" };
   },
 };

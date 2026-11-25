@@ -203,11 +203,11 @@ function ChainLine({ status, source }: { status: VaultStatus; source: DataSource
       status.leaseCount ?? 0n
     )} leases on chain. With a browser wallet, leases read from the chain sign real transactions, one role per wallet; sample leases stay simulated.`;
   } else {
-    text = `Arbitrum Sepolia block ${status.block.toLocaleString("en-US")}, read live. No vault address configured yet, so every write is simulated.`;
+    text = `Arbitrum Sepolia block ${status.block.toLocaleString("en-US")}, read live. Writes are simulated in the browser until the vault is deployed.`;
   }
   return (
     <div aria-live="polite" className="riso-plate space-y-px border-2 border-l-4 border-border border-l-secondary bg-card px-3 py-2 text-xs text-foreground">
-      <p className="font-semibold">{sourceText}</p>
+      <p className={source.kind === "chain" ? "font-semibold" : "text-muted-foreground"}>{sourceText}</p>
       <p>{text}</p>
     </div>
   );

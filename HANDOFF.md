@@ -2,6 +2,11 @@ REDEPLOY NEEDED: DepositVault (measured deposit, Settled event with parties, own
 
 # HANDOFF: Cautio
 
+## QA: external findings (round 1, 2026-11-25)
+
+- **data: "Sample data: DepositVault address is not configured" on https://cautio-beta.vercel.app.** Not fixable from code. No DepositVault exists on Arbitrum Sepolia for this build: `NEXT_PUBLIC_CONTRACT_ADDRESS` and `DEPLOYED_CONTRACT` are empty in `.env.example` and in the deploy env, there is no `contracts/broadcast/` output, and `scripts/proof.mjs` already reports "Not run in this build: NEXT_PUBLIC_CONTRACT_ADDRESS is not configured." The RPC read itself works (the page shows a live block number). The farm's Kontrat deploy step must run `contracts/script/Deploy.s.sol` (or `DeployWithUsdg.s.sol`) with a funded `PRIVATE_KEY`, write the address to `NEXT_PUBLIC_CONTRACT_ADDRESS` with `ADAPTER_MODE=real`, then `npm run demo:reset`. Until then the desk keeps serving seed leases; the notice was reworded to one muted line ("Sample leases shown: DepositVault is not deployed in this build yet") instead of a bold "Sample data" label. The notice stays, because the data is still sample data.
+- **proof: "forge-test: 12 tests passed, 0 failed".** Not a failure; the contract suite passes. No change.
+
 ## Phase 5: riso desk pass, sealed-offer slider, submission package (2026-11-25)
 
 ### Goal

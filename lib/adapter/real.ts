@@ -189,7 +189,7 @@ async function readChain(vault: Address): Promise<ChainRead> {
     const ids = Array.from({ length: n }, (_, i) => newest - i);
     if (n === 0) {
       console.info(`${LOG_PREFIX} chain read leases=0 ms=${Date.now() - started}`);
-      return { ok: false, reason: "Sample data: DepositVault holds no leases yet" };
+      return { ok: false, reason: "Sample leases shown: DepositVault holds no leases yet" };
     }
 
     const rows = (await publicClient.multicall({
@@ -265,7 +265,7 @@ async function readChain(vault: Address): Promise<ChainRead> {
     return { ok: true, leases: desk, block, vault };
   } catch {
     console.warn(`${LOG_PREFIX} chain read failed ms=${Date.now() - started}`);
-    return { ok: false, reason: "Sample data: Arbitrum Sepolia RPC did not answer" };
+    return { ok: false, reason: "Sample leases shown: Arbitrum Sepolia did not answer this read" };
   }
 }
 
@@ -274,7 +274,7 @@ let memo: { at: number; read: Promise<ChainRead> } | null = null;
 
 function current(): Promise<ChainRead> {
   if (!VAULT_ADDRESS) {
-    return Promise.resolve<ChainRead>({ ok: false, reason: "Sample data: DepositVault address is not configured" });
+    return Promise.resolve<ChainRead>({ ok: false, reason: "Sample leases shown: DepositVault is not deployed in this build yet" });
   }
   const now = Date.now();
   if (!memo || now - memo.at > MEMO_MS) {
