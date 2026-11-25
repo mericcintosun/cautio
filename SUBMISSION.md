@@ -55,9 +55,9 @@ Contract tests, written by `npm run proof`:
 
 <!-- PROOF:BEGIN forge-test -->
 ```
-Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 103.78ms (107.87ms CPU time)
-Ran 1 test suite in 104.62ms (103.78ms CPU time): 12 tests passed, 0 failed, 0 skipped (12 total tests)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 89.09ms (91.69ms CPU time)
+Ran 1 test suite in 89.74ms (89.09ms CPU time): 12 tests passed, 0 failed, 0 skipped (12 total tests)
 ```
 
-`forge test` in contracts/, exit code 0, 2026-11-25T11:49:22.910Z.
+`forge test` in contracts/, exit code 0, 2026-11-25T11:52:28.554Z.
 <!-- PROOF:END forge-test -->
