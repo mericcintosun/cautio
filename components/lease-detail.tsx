@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useId, useState, type ChangeEvent, type ReactNode } from "react";
+import { AnimatePresence, MotionConfig, motion, type Variants } from "motion/react";
 import { zeroHash, type Hex } from "viem";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { FileInput } from "@/components/ui/file-input";
 import { Input } from "@/components/ui/input";
 import { ShortHex } from "@/components/ui/address";
+import { OfferRail } from "@/components/offer-rail";
+import { SceneSlot } from "@/components/scene-slot";
 import { TxIntent } from "@/components/tx-intent";
 import { TxStatus } from "@/components/tx-status";
 import { useWallet } from "@/components/wallet-provider";
@@ -62,6 +66,21 @@ export interface Flow {
 
 /** Mirrors MAX_ITEMS in DepositVault.sol, so the form stops before the vault would revert. */
 const MAX_ITEMS = 16;
+
+/** MOTION M5: opacity only, linear, 280ms, no transform. */
+const FADE_TRANSITION = { duration: 0.28, ease: "linear" } as const;
+const PHASE_FADE: Variants = {
+  hidden: { opacity: 0, transition: FADE_TRANSITION },
+  shown: { opacity: 1, transition: FADE_TRANSITION },
+};
+const ROW_LIST: Variants = {
+  hidden: { opacity: 1 },
+  shown: { opacity: 1, transition: { staggerChildren: 0.07 } },
+};
+const ROW_FADE: Variants = {
+  hidden: { opacity: 0, transition: FADE_TRANSITION },
+  shown: { opacity: 1, transition: FADE_TRANSITION },
+};
 
 /**
  * The lease's items, read from the chain or the seed, merged with the lines listed in this
@@ -245,40 +264,59 @@ export function LeaseDetail({ lease, flow, onChange }: { lease: Lease; flow: Flo
         })}
       </ol>
 
-      <div className="space-y-5 p-5">
-        {showItems && (
-          <section aria-label="Deductions" className="space-y-3">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="font-display text-2xl uppercase">Deductions, item by item</h3>
-              <p className="text-sm text-muted-foreground">
-                {formatUsdg(totals.claimed)} claimed of {formatUsdg(lease.deposit)}
-              </p>
-            </div>
-            <ul className="space-y-3">
-              {items.map((it) => (
-                <DeductionRow
-                  key={it.id}
-                  item={it}
-                  answer={flow.answers[it.id] ?? it.answer}
-                  editable={canAnswer}
-                  pending={pending}
-                  onAnswer={(a) => onChange({ ...flow, answers: { ...flow.answers, [it.id]: a } })}
-                />
-              ))}
-            </ul>
-          </section>
-        )}
+      <MotionConfig reducedMotion="user">
+        <div className="space-y-5 p-5">
+          {/* K1 #3: the list staggers in when it appears (after "Send the list"); initial={false}
+              keeps the server HTML and the first paint fully visible. */}
+          <AnimatePresence initial={false}>
+            {showItems && (
+              <motion.section
+                key="deductions"
+                aria-label="Deductions"
+                className="space-y-3"
+                variants={ROW_LIST}
+                initial="hidden"
+                animate="shown"
+                exit="hidden"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="font-display text-2xl uppercase">Deductions, item by item</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {formatUsdg(totals.claimed)} claimed of {formatUsdg(lease.deposit)}
+                  </p>
+                </div>
+                <motion.ul className="space-y-3" variants={ROW_LIST}>
+                  {items.map((it) => (
+                    <DeductionRow
+                      key={it.id}
+                      item={it}
+                      answer={flow.answers[it.id] ?? it.answer}
+                      editable={canAnswer}
+                      pending={pending}
+                      onAnswer={(a) => onChange({ ...flow, answers: { ...flow.answers, [it.id]: a } })}
+                    />
+                  ))}
+                </motion.ul>
+              </motion.section>
+            )}
+          </AnimatePresence>
 
-        <PhaseBody ctx={ctx} flow={flow} totals={totals} act={act} onChange={onChange} setNote={setNote} />
+          {/* K1 #3: each phase exits before the next enters, opacity only (M5). */}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div key={flow.phase} variants={PHASE_FADE} initial="hidden" animate="shown" exit="hidden">
+              <PhaseBody ctx={ctx} flow={flow} totals={totals} act={act} onChange={onChange} setNote={setNote} />
+            </motion.div>
+          </AnimatePresence>
 
-        {note && (
-          <p role="alert" className="rounded-sm border-2 border-destructive bg-background px-3 py-2 text-sm text-destructive">
-            {note}
-          </p>
-        )}
+          {note && (
+            <p role="alert" className="rounded-sm border-2 border-destructive bg-background px-3 py-2 text-sm text-destructive">
+              {note}
+            </p>
+          )}
 
-        <TxStatus state={wallet.state} />
-      </div>
+          <TxStatus state={wallet.state} />
+        </div>
+      </MotionConfig>
     </Card>
   );
 }
@@ -363,21 +401,24 @@ function PhaseBody({
     case "MoveOut": {
       if (flow.clockRunOut) {
         return (
-          <Step
-            title="The landlord stayed silent"
-            hint={`${lease.landlord.name} listed no deductions inside the ${windowText(lease)} window, so the whole deposit opens to ${lease.tenant.name}.`}
-          >
-            <Gate ctx={ctx} need="anyone">
-              <WithIntent ctx={ctx} fn="resolveTimeout">
-                <Button
-                  disabled={pending}
-                  onClick={() => act("resolveTimeout, then settle", "resolveTimeout", [], { phase: "Settled", award: 0 }, [["settle", []]])}
-                >
-                  {pending ? "Sending…" : `Claim full refund of ${formatUsdg(lease.deposit)}`}
-                </Button>
-              </WithIntent>
-            </Gate>
-          </Step>
+          <div className="grid items-start gap-4 md:grid-cols-[minmax(0,1fr)_14rem]">
+            <Step
+              title="The landlord stayed silent"
+              hint={`${lease.landlord.name} listed no deductions inside the ${windowText(lease)} window, so the whole deposit opens to ${lease.tenant.name}.`}
+            >
+              <Gate ctx={ctx} need="anyone">
+                <WithIntent ctx={ctx} fn="resolveTimeout">
+                  <Button
+                    disabled={pending}
+                    onClick={() => act("resolveTimeout, then settle", "resolveTimeout", [], { phase: "Settled", award: 0 }, [["settle", []]])}
+                  >
+                    {pending ? "Sending…" : `Claim full refund of ${formatUsdg(lease.deposit)}`}
+                  </Button>
+                </WithIntent>
+              </Gate>
+            </Step>
+            <SceneSlot n={5} alt="An empty clipboard with no lines on it beside a moving box receiving a full stack of blue bills" width={600} height={600} className="hidden max-w-56 border-2 border-border md:block" />
+          </div>
         );
       }
       const isLandlord = ctx.mode === "sim" || (ctx.mode === "real" && ctx.role === "landlord");
@@ -553,9 +594,12 @@ function ListingForm({ ctx, flow, act }: { ctx: Ctx; flow: Flow; act: Act }) {
       </div>
 
       {items.length === 0 ? (
-        <p className="text-sm">
-          No lines yet. Add each deduction with its move-in and move-out photo; {lease.tenant.name.split(" ")[0]} answers them line by line.
-        </p>
+        <div className="flex flex-wrap items-center gap-4">
+          <SceneSlot n={2} alt="Two photo prints side by side of the same bedroom window, the left one intact and the right one with a diagonal crack, each stamped with a hash check mark" width={640} height={640} className="w-32 border-2 border-border sm:w-40" />
+          <p className="min-w-0 flex-1 basis-56 text-sm">
+            No lines yet. Add each deduction with its move-in and move-out photo; {lease.tenant.name.split(" ")[0]} answers them line by line.
+          </p>
+        </div>
       ) : (
         <ol className="space-y-2">
           {items.map((it, i) => (
@@ -672,7 +716,7 @@ function PhotoField({
       <label htmlFor={id} className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {label} (hashed here, never uploaded)
       </label>
-      <Input id={id} type="file" accept="image/*" disabled={disabled} onChange={onFile} />
+      <FileInput id={id} accept="image/*" disabled={disabled} onChange={onFile} />
       {state.kind === "hashing" && <p className="text-xs text-muted-foreground">Hashing…</p>}
       {state.kind === "hashed" && (
         <p className="flex min-w-0 flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
@@ -728,8 +772,10 @@ function DeductionRow({
     }
   }
 
+  const checkId = useId();
+
   return (
-    <li className="rounded-sm border-2 border-border bg-background">
+    <motion.li variants={ROW_FADE} className="rounded-sm border-2 border-border bg-background">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-border px-4 py-2">
         <p className="font-semibold">{item.label}</p>
         <div className="flex items-center gap-2">
@@ -743,19 +789,19 @@ function DeductionRow({
         <PhotoSide label="Move-in photo" note={item.entryNote} hash={item.entryPhoto} />
         <PhotoSide label="Move-out photo" note={item.exitNote} hash={item.exitPhoto} />
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted-foreground">
-          <span>Check a photo against the anchored hashes (SHA-256, computed in your browser)</span>
-          <Input type="file" accept="image/*" onChange={onFile} className="max-w-sm" />
+      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+        <div className="flex min-w-0 flex-col gap-2 text-xs text-muted-foreground sm:flex-1">
+          <p id={checkId}>Check a photo against the anchored hashes (SHA-256, computed in your browser)</p>
+          <FileInput accept="image/*" onChange={onFile} buttonLabel="Check a photo" emptyText="No photo checked" aria-describedby={checkId} />
           {check.state === "hashing" && <span>Hashing…</span>}
           {check.state === "match" && <span className="font-semibold text-ok">Matches the {check.which} photo on chain.</span>}
           {check.state === "nomatch" && (
             <span className="font-semibold text-destructive">No match. This file hashes to {shortHex(check.hash)}.</span>
           )}
           {check.state === "error" && <span className="font-semibold text-destructive">This browser could not hash the file.</span>}
-        </label>
+        </div>
         {editable && (
-          <div className="flex gap-2">
+          <div className="flex shrink-0 gap-2">
             <Button size="sm" variant={answer === "accepted" ? "default" : "outline"} disabled={pending} onClick={() => onAnswer("accepted")}>
               Accept
             </Button>
@@ -765,7 +811,7 @@ function DeductionRow({
           </div>
         )}
       </div>
-    </li>
+    </motion.li>
   );
 }
 
@@ -812,6 +858,7 @@ function FinalOffers({
   setNote: (note: string | null) => void;
 }) {
   const { lease, pending, mode, role } = ctx;
+  const ids = useId();
   const cap = totals.disputed;
   const [drafts, setDrafts] = useState<Record<Side, string>>({
     landlord: String(cap),
@@ -887,6 +934,10 @@ function FinalOffers({
         </p>
       </div>
 
+      {!flow.opened && (
+        <SceneSlot n={3} alt="Two sealed envelopes with wax seals, one orange and one blue, and an agent's hand lifting only the blue envelope" width={960} height={480} className="hidden max-w-md border-2 border-border sm:block" />
+      )}
+
       <div className="grid gap-4 md:grid-cols-2">
         {(["landlord", "tenant"] as const).map((side) => {
           const offer = flow.offers[side];
@@ -914,17 +965,33 @@ function FinalOffers({
                 )
               ) : (
                 <Gate ctx={ctx} need={[side]}>
-                  <div className="space-y-2">
-                    <label className="block space-y-1 text-xs text-muted-foreground">
-                      <span>Final number, 0 to {cap} USDG</span>
+                  <div className="space-y-3">
+                    <OfferRail
+                      value={valid ? Number(value) : 0}
+                      max={cap}
+                      accepted={totals.accepted}
+                      deposit={lease.deposit}
+                      landlordName={lease.landlord.name.split(" ")[0]}
+                      tenantName={lease.tenant.name.split(" ")[0]}
+                      disabled={pending || flow.phase !== "Sealed"}
+                      onChange={(n) => setDrafts((d) => ({ ...d, [side]: String(n) }))}
+                    />
+                    <div className="space-y-1">
+                      <label htmlFor={`${ids}-${side}-offer`} className="block text-xs text-muted-foreground">
+                        Exact number, 0 to {cap} USDG
+                      </label>
                       <Input
+                        id={`${ids}-${side}-offer`}
                         inputMode="numeric"
                         value={value}
                         disabled={pending}
-                        onChange={(e) => setDrafts({ ...drafts, [side]: e.target.value.replace(/[^\d]/g, "") })}
+                        onChange={(e) => {
+                          const next = e.target.value.replace(/[^\d]/g, "");
+                          setDrafts((d) => ({ ...d, [side]: next }));
+                        }}
                         aria-invalid={!valid}
                       />
-                    </label>
+                    </div>
                     {!valid && <p className="text-xs font-semibold text-destructive">Enter a whole number up to {cap}.</p>}
                     <WithIntent ctx={ctx} fn="commitOffer">
                       <Button size="sm" variant="secondary" disabled={!valid || pending || flow.phase !== "Sealed"} onClick={() => seal(side)}>
@@ -1031,7 +1098,8 @@ function Payout({ lease, award }: { lease: Lease; award: number }) {
   return (
     <div className="space-y-3 rounded-sm border-2 border-border bg-card p-4">
       <h3 className="font-display text-2xl uppercase">Paid out in one transaction</h3>
-      <div className="flex h-10 overflow-hidden rounded-sm border-2 border-border" aria-hidden>
+      <SceneSlot n={4} alt="One stack of orange bills sliding to a landlord's key and a larger blue stack sliding to a tenant's moving box" width={1200} height={500} className="border-2 border-border" />
+      <div className="riso-plate flex h-10 border-2 border-border" aria-hidden>
         {award > 0 && <div className="bg-primary" style={{ flexGrow: award }} />}
         {back > 0 && <div className="riso-halftone-blue bg-background" style={{ flexGrow: back }} />}
       </div>
