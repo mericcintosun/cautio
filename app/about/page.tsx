@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DEFAULT_LEASE_ID } from "@/lib/data";
 
 export const metadata: Metadata = {
-  title: "How Cautio works",
+  title: "How it works",
   description:
     "Why Cautio exists, how a deposit moves through the DepositVault state machine, and what runs on Arbitrum and USDG.",
 };
