@@ -2,7 +2,7 @@
 
 **A rental deposit held in a shared USDG vault on Arbitrum. At move-out every deduction is its own photo-backed line, and any dispute ends with an arbiter picking one of two sealed final offers.**
 
-> Live demo: https://cautio.vercel.app
+> Live demo: https://cautio-beta.vercel.app
 
 ## The problem
 
