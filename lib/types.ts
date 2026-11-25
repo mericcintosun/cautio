@@ -1,4 +1,5 @@
 import type { Address, Hex } from "viem";
+import type { ErrorCode } from "./errors";
 
 // Shared types for the lease desk. Relative-import safe (no "@/" paths) so that
 // scripts/seed.ts can load them through tsx.
@@ -58,7 +59,12 @@ export interface Lease {
 /** Envelope for every /api response. `source` says whether the data came from seed or chain. */
 export type ApiResponse<T> =
   | { ok: true; source: "fake" | "real"; data: T }
-  | { ok: false; source: "fake" | "real"; error: string };
+  | { ok: false; source: "fake" | "real"; error: ErrorCode; hint: string };
+
+/** Where the desk's leases came from, as shown in the chain status line. */
+export type DataSource =
+  | { kind: "seed"; reason: string }
+  | { kind: "chain"; chainId: number; vault: Address; block: string };
 
 /** What the tenant fills in on the open-lease panel before `openLease`. */
 export type OpenLeaseInput = {

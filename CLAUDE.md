@@ -11,8 +11,10 @@ Read `IDENTITY.md` first (it overrides taste), then `DEMO.md`, then `HANDOFF.md`
 Next.js 15 App Router, TypeScript strict, Tailwind v4 with no tailwind.config, `motion` 14, `viem` 2. npm only, no pnpm.
 
 ## Layout
-- Reads: `getAdapter()` in `lib/adapter` (server side, `ADAPTER_MODE`, default fake).
-- Writes: `sendVaultTx()` in `lib/vault.ts` (client side, mocked until Phase 2).
+- Config: `lib/config.ts` is the only reader of `process.env` for the chain (besides `lib/brand-files.ts` and `next.config.ts`). It holds no secrets.
+- Reads: `getAdapter()` in `lib/adapter` (server side, `ADAPTER_MODE`, default fake; `real` reads DepositVault).
+- Writes: `sendVaultTx()` in `lib/vault.ts` (client side; real through `window.ethereum` when a vault address and wallet exist, simulated otherwise). Args go through `buildVaultArgs`, never prepend the lease id at the call site.
+- Errors: `toCoreError()` in `lib/errors.ts`; API routes return `{ ok:false, error, hint }`.
 - Types in `lib/types.ts`, seed in `lib/data/seed.ts`, `lib/data.ts` is the compatibility barrel.
 
 ## Pitfalls
