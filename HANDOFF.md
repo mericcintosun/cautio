@@ -1,5 +1,54 @@
 # HANDOFF: Cautio
 
+## Phase 1: walking skeleton (2026-11-25)
+
+### Goal
+All five steps of the 90 second demo (DEMO.md) are clickable on fake data, starting from `/`. Step 1 (tenant locks 3,000 USDG) gets its screen at `/?view=open`; steps 2 to 5 now read through the adapter seam.
+
+### Status
+- Slice 1 done: `DEMO.md`, `CLAUDE.md`.
+- Slice 2 done: `lib/types.ts`, `lib/data/seed.ts`, `lib/data.ts` barrel, `lib/adapter/{index,fake}.ts`, `scripts/seed.ts`, `tsx` devDependency, `"openLease"` in `VaultWrite`. **Cut:** `fixtures/leases.json` was not hand-written (the photo hashes, salts and addresses come from sha256/keccak256 and cannot be reproduced by hand). The runner's first `npm run seed` creates it.
+- Slice 3 done: `app/api/leases/route.ts`, `app/api/leases/[id]/route.ts`, `app/page.tsx` through `getAdapter()`, `app/loading.tsx`, empty state in `components/lease-desk.tsx`. `LayoutGroup` and `layoutId` untouched.
+- Slice 4 done: title template, `components/ui/nav-link.tsx` (brand link and "How it works" both get `aria-current`), per-view `generateMetadata`, branded `error.tsx` and `not-found.tsx`, `lib/brand-colors.ts`, `.env.example` additions.
+- Slice 5 done: `components/open-lease-panel.tsx` (mocked approve plus `sendVaultTx("openLease")`, photo SHA-256, idle, sending, done and error states), "Open a new deposit" link in the desk header.
+- Slice 6 done: `contracts/test/DepositVault.t.sol` with `test_disputedPaintTenantOfferPicked` (local `Vm` interface, no forge-std). Not run: the agent has no shell.
+- Build not run by the agent. Unverified until the runner's `npm run build`.
+
+### Decisions
+- `@/lib/data` became a compatibility barrel: it re-exports `lib/types.ts` and `lib/data/seed.ts` and keeps the format helpers. All old imports compile unchanged.
+- Reads go through `getAdapter()` (server side: pages and API routes). Writes stay in the client-side `sendVaultTx` in `lib/vault.ts`, still mocked.
+- `ADAPTER_MODE=real` returns the fake adapter for now (`TODO(Phase 2)` in `lib/adapter/index.ts`). The real adapter is pending.
+- `seedParty(name)` is exported from the seed so the open-lease panel derives the same deterministic demo address the seed uses for a name.
+- `OpenLeasePanel` takes a `template` prop (the `rua-harmonia-302` lease) for its defaults: Larissa Mendes, Otávio Ferraz, Camila Rocha, rent 1,000, 30 days.
+- The contract test checks its deposit in plain `require`s and declares `IS_TEST = true` for older forge versions.
+- README tech stack line now names majors: Next.js 15, React 19, Motion 14, viem 2, Tailwind v4.
+
+### Failed attempts
+None.
+
+### Files changed
+DEMO.md, CLAUDE.md, README.md, HANDOFF.md, .farm-commits.json, .env.example, package.json, lib/types.ts, lib/data.ts, lib/data/seed.ts, lib/adapter/index.ts, lib/adapter/fake.ts, lib/vault.ts, lib/brand-colors.ts, scripts/seed.ts, app/page.tsx, app/loading.tsx, app/layout.tsx, app/error.tsx, app/not-found.tsx, app/opengraph-image.tsx, app/about/page.tsx, app/api/leases/route.ts, app/api/leases/[id]/route.ts, components/lease-desk.tsx, components/open-lease-panel.tsx, components/ui/nav-link.tsx, contracts/test/DepositVault.t.sol.
+
+### Commands run
+none, agent has no shell; runner runs build
+
+### Manual checklist
+- `git rm contracts/src/App.sol` (template leftover; the agent cannot delete files).
+- `npm run seed` once, then commit `fixtures/leases.json`. Run it a second time and check that `git diff fixtures/leases.json` is empty.
+- `cd contracts && forge build && forge test` should pass `test_disputedPaintTenantOfferPicked` without `forge install`.
+- Before Phase 2: fund the farm wallet (`FARM_EVM_PRIVATE_KEY`) with about 0.02 Arbitrum Sepolia ETH (https://arbitrum.faucet.dev/, https://sepoliafaucet.com/, https://ethfaucet.com/networks/arbitrum). RPC `https://sepolia-rollup.arbitrum.io/rpc`, chain 421614.
+
+### Open questions
+- `fixtures/leases.json` is not in the repo yet (see Status). Nothing in the app imports it.
+- Pre-existing: `sendVaultTx` uses `Date.now()` for its fake hash. It is allowed (it is not in the seed), but the fake hashes are not reproducible.
+- Pre-existing: party addresses in `lease-detail.tsx` render as `shortHex` without an `overflow-x-auto` wrapper, and sealed commits use `break-all`. Both fit on mobile, but a strict reading of the "hash line in overflow-x-auto" rule would want a wrapper. Left as is to keep the step 2 and 3 flow untouched.
+- Choosing a lease cell while `?view=open` is showing replaces the URL with `?lease=<id>`, which closes the panel. That is intended, but worth confirming.
+
+### Next best step
+Phase 2: deploy DepositVault and MockUSDG on Arbitrum Sepolia, add wagmi writes behind `sendVaultTx`, create `npm run proof` and `.farm-live.json`, implement the real adapter behind `ADAPTER_MODE=real`, and record the live URL here.
+
+---
+
 You are picking up a working Next.js 15 scaffold for **Cautio**. Read this whole file, then `IDENTITY.md`, then start on the Mission list in order.
 
 ## 1. Context
