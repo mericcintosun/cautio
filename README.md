@@ -38,7 +38,7 @@ Silence always loses. If the landlord lists nothing within the window, the whole
 
 ## Tech stack
 
-Next.js 15 (App Router), TypeScript, Tailwind CSS v4, shadcn-style primitives, Motion for layout transitions, viem, Solidity 0.8.24 with Foundry, Arbitrum Sepolia, Paxos USDG (MockUSDG on testnet), Vercel.
+Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS v4, shadcn-style primitives, Motion 14 for layout transitions, viem 2, Solidity 0.8.24 with Foundry, Arbitrum Sepolia, Paxos USDG (MockUSDG on testnet), Vercel.
 
 ## Quickstart
 
