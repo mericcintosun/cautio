@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LeaseDetail, initFlow, type Flow } from "@/components/lease-detail";
 import { PHASE_LABEL, formatUsdg, shortHex, type Lease, type Phase } from "@/lib/data";
+import type { DataSource } from "@/lib/types";
 import { readVaultStatus, type VaultStatus } from "@/lib/vault";
 
 const layoutSpring = { type: "spring", stiffness: 420, damping: 38 } as const;
@@ -27,7 +28,7 @@ const phaseTone: Record<Phase, "default" | "secondary" | "outline" | "ok" | "war
  * Signature interaction (K1 #1): a lease cell grows into the detail view through a
  * shared layoutId, and the detail shrinks back into its cell when another lease opens.
  */
-export function LeaseDesk({ leases, initialId }: { leases: Lease[]; initialId: string }) {
+export function LeaseDesk({ leases, initialId, source }: { leases: Lease[]; initialId: string; source: DataSource }) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState(initialId);
   const [flows, setFlows] = useState<Record<string, Flow>>(() =>
@@ -52,7 +53,7 @@ export function LeaseDesk({ leases, initialId }: { leases: Lease[]; initialId: s
   if (!selected) {
     return (
       <div className="space-y-5">
-        <DeskHeader status={status} />
+        <DeskHeader status={status} source={source} />
         <div className="cautio-enter space-y-3 rounded-sm border-2 border-border bg-background p-6">
           <h2 className="text-3xl text-foreground">No deposits at the desk yet</h2>
           <p className="max-w-[52ch] text-sm text-muted-foreground">
@@ -77,7 +78,7 @@ export function LeaseDesk({ leases, initialId }: { leases: Lease[]; initialId: s
     <MotionConfig reducedMotion="user">
       <LayoutGroup>
         <div className="space-y-5">
-          <DeskHeader status={status} />
+          <DeskHeader status={status} source={source} />
 
           <motion.article key={selected.id} layoutId={`lease-${selected.id}`} transition={layoutSpring}>
             <LeaseDetail
@@ -119,11 +120,11 @@ export function LeaseDesk({ leases, initialId }: { leases: Lease[]; initialId: s
   );
 }
 
-function DeskHeader({ status }: { status: VaultStatus }) {
+function DeskHeader({ status, source }: { status: VaultStatus; source: DataSource }) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0 flex-1">
-        <ChainLine status={status} />
+        <ChainLine status={status} source={source} />
       </div>
       <Button asChild variant="outline" size="sm" className="self-start">
         <Link href="/?view=open" scroll={false}>
@@ -134,22 +135,28 @@ function DeskHeader({ status }: { status: VaultStatus }) {
   );
 }
 
-function ChainLine({ status }: { status: VaultStatus }) {
+function ChainLine({ status, source }: { status: VaultStatus; source: DataSource }) {
+  const sourceText =
+    source.kind === "chain"
+      ? `Live: DepositVault ${shortHex(source.vault)} on Arbitrum Sepolia, block ${source.block}`
+      : source.reason;
+
   let text: string;
   if (status.kind === "loading") {
     text = "Reading Arbitrum Sepolia…";
   } else if (status.kind === "offline") {
-    text = `Arbitrum Sepolia RPC did not answer (${status.reason}). Showing seed deposits, actions simulated.`;
+    text = `Arbitrum Sepolia RPC did not answer from this browser (${status.reason}) Writes are simulated.`;
   } else if (status.vault) {
     text = `Arbitrum Sepolia block ${status.block.toLocaleString("en-US")}. Vault ${shortHex(status.vault)} holds ${String(
       status.leaseCount ?? 0n
-    )} leases on chain; the desk below still shows seed deposits.`;
+    )} leases on chain. With a browser wallet, every button below signs a real transaction.`;
   } else {
-    text = `Arbitrum Sepolia block ${status.block.toLocaleString("en-US")}, read live. No vault address configured yet, so these are seed deposits and every write is simulated.`;
+    text = `Arbitrum Sepolia block ${status.block.toLocaleString("en-US")}, read live. No vault address configured yet, so every write is simulated.`;
   }
   return (
-    <p aria-live="polite" className="border-l-4 border-secondary bg-background px-3 py-2 text-xs text-foreground">
-      {text}
-    </p>
+    <div aria-live="polite" className="space-y-px border-l-4 border-secondary bg-background px-3 py-2 text-xs text-foreground">
+      <p className="font-semibold">{sourceText}</p>
+      <p>{text}</p>
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 import { leases } from "../data/seed";
-import type { Lease } from "../types";
+import type { DataSource, Lease } from "../types";
 import type { CautioAdapter } from "./index";
 
 // Serves the seed leases. Every call returns deep copies, so a caller that mutates
@@ -14,5 +14,8 @@ export const fakeAdapter: CautioAdapter = {
   async getLease(id: string): Promise<Lease | null> {
     const found = leases.find((l) => l.id === id);
     return found ? copy(found) : null;
+  },
+  async describe(): Promise<DataSource> {
+    return { kind: "seed", reason: "Sample data: seed leases from lib/data/seed.ts" };
   },
 };

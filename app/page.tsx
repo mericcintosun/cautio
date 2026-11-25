@@ -21,7 +21,8 @@ export async function generateMetadata({ searchParams }: { searchParams: HomeSea
 // lease desk sits on the orange block cut by a diagonal clip-path.
 export default async function Home({ searchParams }: { searchParams: HomeSearch }) {
   const { lease, view } = await searchParams;
-  const leases = await getAdapter().listLeases();
+  const adapter = getAdapter();
+  const [leases, source] = await Promise.all([adapter.listLeases(), adapter.describe()]);
   const fallbackId = leases.some((l) => l.id === DEFAULT_LEASE_ID) ? DEFAULT_LEASE_ID : (leases[0]?.id ?? DEFAULT_LEASE_ID);
   const initialId = leases.some((l) => l.id === lease) ? (lease as string) : fallbackId;
   const template = leases.find((l) => l.id === DEFAULT_LEASE_ID) ?? leases[0] ?? null;
@@ -64,7 +65,7 @@ export default async function Home({ searchParams }: { searchParams: HomeSearch 
         <div className="relative -mx-4 space-y-6 px-4 pb-10 pt-16 lg:mx-0 lg:flex-1 lg:px-0 lg:pb-0 lg:pt-0">
           <div aria-hidden className="cautio-split-narrow absolute inset-0 -z-10 bg-primary lg:hidden" />
           {view === "open" && <OpenLeasePanel template={template} />}
-          <LeaseDesk leases={leases} initialId={initialId} />
+          <LeaseDesk leases={leases} initialId={initialId} source={source} />
         </div>
       </div>
     </section>
