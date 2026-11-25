@@ -26,7 +26,7 @@ import {
   USDG_DECIMALS,
   VAULT_ADDRESS,
 } from "./config";
-import { toCoreError } from "./errors";
+import { toCoreError, type CoreError } from "./errors";
 
 // The one integration module between the UI and DepositVault on Arbitrum.
 // Reads use the public Arbitrum Sepolia RPC (no key). Writes go through sendVaultTx:
@@ -52,6 +52,19 @@ export const depositVaultAbi = parseAbi([
   "function resolveTimeout(uint256 id)",
   "function settle(uint256 id)",
   "function withdraw()",
+  // Custom errors, copied from DepositVault.sol lines 75 to 86, so viem can decode reverts.
+  "error InvalidParty()",
+  "error InvalidAmount()",
+  "error InvalidWindow()",
+  "error WrongPhase(uint8 expected, uint8 actual)",
+  "error NotAllowed()",
+  "error DeadlinePassed()",
+  "error DeadlineNotReached()",
+  "error TooManyItems()",
+  "error AlreadyDone()",
+  "error BadReveal()",
+  "error TransferFailed()",
+  "error Frozen()",
 ]);
 
 const erc20ApproveAbi = parseAbi(["function approve(address,uint256) returns (bool)"]);
@@ -108,11 +121,28 @@ export function newSalt(): Hex {
 }
 
 /** Keep the salt where the reveal step can find it again. Losing it means losing the reveal. */
-export function rememberSalt(leaseId: string, side: string, salt: Hex): void {
+export function rememberSalt(leaseId: string, side: string, salt: Hex, amountUsdg?: number): void {
   try {
     window.localStorage.setItem(`cautio:salt:${leaseId}:${side}`, salt);
+    if (amountUsdg !== undefined) window.localStorage.setItem(`cautio:amount:${leaseId}:${side}`, String(amountUsdg));
   } catch {
     // Private mode or storage full: the salt still lives in memory for this session.
+  }
+}
+
+/**
+ * Reads back what rememberSalt stored for this lease and side. Per-user browser state,
+ * not a store: it never leaves the browser that sealed the offer.
+ */
+export function recallSalt(leaseId: string, side: string): { salt: Hex; amount: number | null } | null {
+  try {
+    const salt = window.localStorage.getItem(`cautio:salt:${leaseId}:${side}`);
+    if (!salt || !/^0x[0-9a-fA-F]{64}$/.test(salt)) return null;
+    const raw = window.localStorage.getItem(`cautio:amount:${leaseId}:${side}`);
+    const amount = raw !== null && /^\d+$/.test(raw) ? Number(raw) : null;
+    return { salt: salt as Hex, amount };
+  } catch {
+    return null;
   }
 }
 
@@ -163,26 +193,106 @@ export function buildVaultArgs(fn: VaultWrite, leaseId: number, args: readonly u
   }
 }
 
-function browserWallet(): EIP1193Provider | null {
+/** Where a lease's data came from. Only "chain" leases may sign real transactions. */
+export type LeaseOrigin = "chain" | "seed";
+
+/** The injected browser wallet (window.ethereum), or null on the server and without one. */
+export function browserWallet(): EIP1193Provider | null {
   if (typeof window === "undefined") return null;
   const eth = (window as unknown as { ethereum?: EIP1193Provider }).ethereum;
   return eth ?? null;
 }
 
-/** True when sendVaultTx would sign a real transaction instead of simulating one. */
-export function canSendRealTx(fn: VaultWrite, leaseId: number): boolean {
-  return VAULT_ADDRESS !== null && browserWallet() !== null && (leaseId > 0 || fn === "openLease");
+function walletClient(provider: EIP1193Provider) {
+  return createWalletClient({ chain: arbitrumSepolia, transport: custom(provider) });
+}
+
+/** Asks the wallet for an account. Returns the account and the chain the wallet is on. */
+export async function connectBrowserWallet(): Promise<{ account: Address; chainId: number }> {
+  const provider = browserWallet();
+  if (!provider) throw new Error("no browser wallet", { cause: { error: "not_configured", hint: "No browser wallet found. Writes stay simulated." } });
+  const wallet = walletClient(provider);
+  const [account] = await wallet.requestAddresses();
+  const chainId = await wallet.getChainId();
+  return { account, chainId };
+}
+
+/** Reads the already authorized account without a prompt, or null. */
+export async function readBrowserWallet(): Promise<{ account: Address; chainId: number } | null> {
+  const provider = browserWallet();
+  if (!provider) return null;
+  const wallet = walletClient(provider);
+  const [account] = await wallet.getAddresses();
+  if (!account) return null;
+  return { account, chainId: await wallet.getChainId() };
+}
+
+/** Switches the wallet to Arbitrum Sepolia; adds the chain first when the wallet does not know it (4902). */
+export async function switchToVaultChain(): Promise<void> {
+  const provider = browserWallet();
+  if (!provider) return;
+  const wallet = walletClient(provider);
+  try {
+    await wallet.switchChain({ id: CHAIN_ID });
+  } catch (err) {
+    if (!hasCode(err, 4902)) throw err;
+    await wallet.addChain({ chain: arbitrumSepolia });
+    await wallet.switchChain({ id: CHAIN_ID });
+  }
+}
+
+function hasCode(err: unknown, code: number): boolean {
+  let cur: unknown = err;
+  for (let i = 0; i < 8 && cur && typeof cur === "object"; i++) {
+    if ((cur as { code?: unknown }).code === code) return true;
+    cur = (cur as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+/**
+ * True when sendVaultTx would sign a real transaction instead of simulating one:
+ * a vault address, a browser wallet, and a lease read from the chain (openLease always
+ * creates a chain lease).
+ */
+export function canSendRealTx(fn: VaultWrite, leaseId: number, origin?: LeaseOrigin): boolean {
+  return VAULT_ADDRESS !== null && browserWallet() !== null && origin === "chain" && (leaseId > 0 || fn === "openLease");
+}
+
+// Writes on their way, keyed `${fn}:${leaseId}`. A double click cannot send a second identical write.
+const inFlight = new Set<string>();
+
+function assertNotInFlight(fn: VaultWrite, leaseId: number): string {
+  const key = `${fn}:${leaseId}`;
+  if (inFlight.has(key)) {
+    const core: CoreError = { error: "invalid_input", hint: "That call is already on its way. Wait for it to confirm." };
+    throw new Error(core.hint, { cause: core });
+  }
+  inFlight.add(key);
+  return key;
 }
 
 async function realVaultTx(fn: VaultWrite, leaseId: number, args: readonly unknown[]): Promise<VaultTx> {
   const vault = VAULT_ADDRESS as Address;
   const provider = browserWallet() as EIP1193Provider;
-  const wallet = createWalletClient({ chain: arbitrumSepolia, transport: custom(provider) });
+  const wallet = walletClient(provider);
   const [account] = await wallet.requestAddresses();
-  await wallet.switchChain({ id: CHAIN_ID });
+  await switchToVaultChain();
 
   const callArgs = buildVaultArgs(fn, leaseId, args);
   console.info(`${LOG_PREFIX} tx requested fn=${fn}`);
+
+  // Dry run first, so a revert comes back decoded (NotAllowed, WrongPhase...) before the
+  // wallet asks for a signature. openLease is skipped: it needs the approve below first.
+  if (fn !== "openLease") {
+    await publicClient.simulateContract({
+      address: vault,
+      abi: depositVaultAbi,
+      functionName: fn,
+      args: callArgs,
+      account,
+    } as never);
+  }
 
   if (fn === "openLease") {
     const token = await publicClient.readContract({ address: vault, abi: depositVaultAbi, functionName: "token" });
@@ -219,23 +329,34 @@ async function realVaultTx(fn: VaultWrite, leaseId: number, args: readonly unkno
 
 /**
  * Sends one DepositVault write.
- * Real path: NEXT_PUBLIC_CONTRACT_ADDRESS is set, a browser wallet is present and the
- * lease has an on-chain id (or fn is openLease). The wallet signs, and the call waits
- * for the receipt on Arbitrum Sepolia.
+ * Real path: NEXT_PUBLIC_CONTRACT_ADDRESS is set, a browser wallet is present, the lease
+ * was read from the chain (origin "chain") and has an on-chain id (or fn is openLease).
+ * The wallet signs, and the call resolves only after the receipt on Arbitrum Sepolia.
  * Simulated path otherwise: waits like a block would and returns a labelled fake hash.
  * A failure throws an Error whose `cause` is a CoreError with a human hint.
+ * The same fn on the same lease cannot be in flight twice (assertNotInFlight).
  */
-export async function sendVaultTx(fn: VaultWrite, leaseId: number, args: readonly unknown[] = []): Promise<VaultTx> {
-  if (canSendRealTx(fn, leaseId)) {
-    try {
-      return await realVaultTx(fn, leaseId, args);
-    } catch (err) {
-      const core = toCoreError(err);
-      console.warn(`${LOG_PREFIX} tx failed fn=${fn} error=${core.error}`);
-      throw new Error(core.hint, { cause: core });
+export async function sendVaultTx(
+  fn: VaultWrite,
+  leaseId: number,
+  args: readonly unknown[] = [],
+  origin?: LeaseOrigin
+): Promise<VaultTx> {
+  const key = assertNotInFlight(fn, leaseId);
+  try {
+    if (canSendRealTx(fn, leaseId, origin)) {
+      try {
+        return await realVaultTx(fn, leaseId, args);
+      } catch (err) {
+        const core = toCoreError(err);
+        console.warn(`${LOG_PREFIX} tx failed fn=${fn} error=${core.error}`);
+        throw new Error(core.hint, { cause: core });
+      }
     }
+    await new Promise((r) => setTimeout(r, 450));
+    const hash = keccak256(stringToHex(`${fn}:${leaseId}:${args.map(String).join(",")}:${Date.now()}`));
+    return { hash, simulated: true };
+  } finally {
+    inFlight.delete(key);
   }
-  await new Promise((r) => setTimeout(r, 450));
-  const hash = keccak256(stringToHex(`${fn}:${leaseId}:${args.map(String).join(",")}:${Date.now()}`));
-  return { hash, simulated: true };
 }

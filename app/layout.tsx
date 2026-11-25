@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Anton, Work_Sans } from "next/font/google";
 import { BrandMark } from "@/components/brand-mark";
-import { Button } from "@/components/ui/button";
 import { NavLink } from "@/components/ui/nav-link";
-import { DEFAULT_LEASE_ID } from "@/lib/data";
+import { WalletButton } from "@/components/wallet-button";
+import { WalletProvider } from "@/components/wallet-provider";
 import "./globals.css";
 
 const anton = Anton({ subsets: ["latin"], weight: ["400"], display: "swap", variable: "--font-anton" });
@@ -21,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${anton.variable} ${workSans.variable}`}>
       <body className="flex min-h-screen flex-col antialiased">
+        <WalletProvider>
         <header className="sticky top-0 z-40 border-b-2 border-border bg-background">
           <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 lg:px-8">
             <NavLink
@@ -39,9 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               >
                 How it works
               </NavLink>
-              <Button asChild size="sm">
-                <Link href={`/?lease=${DEFAULT_LEASE_ID}`}>Walk the disputed move-out</Link>
-              </Button>
+              <WalletButton />
             </nav>
           </div>
         </header>
@@ -52,6 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <p>Built for Arbitrum Open House São Paulo.</p>
           </div>
         </footer>
+        </WalletProvider>
       </body>
     </html>
   );
