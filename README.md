@@ -126,7 +126,7 @@ Written by `npm run proof`. Each block says plainly when it has not run.
 **Chain read**
 
 <!-- PROOF:BEGIN chain-read -->
-Arbitrum Sepolia (421614) block 332592216 read in 234 ms on 2026-11-25T12:10:20.406Z.
+Arbitrum Sepolia (421614) block 332593539 read in 279 ms on 2026-11-25T12:16:29.520Z.
 
 Not run in this build: NEXT_PUBLIC_CONTRACT_ADDRESS is not configured.
 <!-- PROOF:END chain-read -->
@@ -135,11 +135,11 @@ Not run in this build: NEXT_PUBLIC_CONTRACT_ADDRESS is not configured.
 
 <!-- PROOF:BEGIN forge-test -->
 ```
-Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 81.11ms (85.20ms CPU time)
-Ran 1 test suite in 82.18ms (81.11ms CPU time): 12 tests passed, 0 failed, 0 skipped (12 total tests)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 137.32ms (141.93ms CPU time)
+Ran 1 test suite in 138.64ms (137.32ms CPU time): 12 tests passed, 0 failed, 0 skipped (12 total tests)
 ```
 
-`forge test` in contracts/, exit code 0, 2026-11-25T12:10:20.823Z.
+`forge test` in contracts/, exit code 0, 2026-11-25T12:16:30.039Z.
 <!-- PROOF:END forge-test -->
 
 **Demo state (anchor leases)**
