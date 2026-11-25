@@ -147,7 +147,8 @@ export default function AboutPage() {
             <CardContent className="space-y-2 text-sm">
               <p>
                 One Solidity contract on Arbitrum Sepolia (chain 421614) with an explicit state machine, custom errors,
-                a reentrancy guard and checks-effects-interactions on every payout.
+                a reentrancy guard and checks-effects-interactions on every payout. openLease measures the USDG it pulls
+                in, and settle pays both sides in one transaction.
               </p>
             </CardContent>
           </Card>
@@ -157,9 +158,10 @@ export default function AboutPage() {
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <p>
-                Deposits are denominated in USDG. Before paying anyone, the vault asks USDG&apos;s isFrozen(). A frozen
-                recipient&apos;s share is held in the vault and pulled later, so one frozen wallet cannot block the other
-                side&apos;s refund.
+                Deposits are denominated in USDG through the vault&apos;s IUSDG interface. Before paying anyone, _payOut
+                asks _isFrozen(), which calls USDG&apos;s isFrozen(). A frozen recipient&apos;s share is held in owed and
+                pulled later with withdraw(), so one frozen wallet cannot block the other side&apos;s refund. The browser
+                approves exactly the deposit on token() before openLease. Testnet runs on MockUSDG with the same surface.
               </p>
             </CardContent>
           </Card>

@@ -36,6 +36,24 @@ Silence always loses. If the landlord lists nothing within the window, the whole
 | Dispute resolution | sealed final offers, arbiter picks one | landlord keeps it if nobody objects | none found | general jury or approver |
 | Silent landlord | full refund after 30 days | not documented | not documented | not rent specific |
 
+## Prize tracks
+
+| Bounty | Prize | Slots | Required tech | Code file | DEMO step |
+| --- | --- | --- | --- | --- | --- |
+| Overall Prize First Place | First Place 30,000 USDC | 1 | Arbitrum chain | `contracts/src/DepositVault.sol` | 3 |
+| Promising Products Track First Place | First Place 7,000 USDC | 1 | Arbitrum chain | `contracts/src/DepositVault.sol` | 3 |
+
+There are no sponsor bounty rows in this hackathon; both rows are main placements.
+
+Qualification, quoted from the hackathon page: "Your project must be deployed on an Arbitrum chain to qualify". DepositVault and MockUSDG run on Arbitrum Sepolia (chain id 421614).
+
+**USDG (extra consideration).** Quoted from the hackathon page: "Extra consideration is given to projects integrating Paxos' USDG stablecoin ." USDG is load bearing in two places:
+
+- `contracts/src/DepositVault.sol`: the `IUSDG` interface is the vault's only token type; `_isFrozen` asks USDG's `isFrozen()` before every payout; `_payOut` pushes each share or credits `owed` for a frozen recipient; `withdraw` pulls a held share later.
+- `lib/vault.ts`: before `openLease`, the browser wallet calls `approve` on the address the vault returns from `token()`, for exactly the deposit.
+
+Depth test: remove `token` from the vault and DEMO steps 1, 3 and 5 break, because there is no deposit to lock or pay out. On testnet the vault runs on `MockUSDG`, which has the same surface (6 decimals, `isFrozen`, owner-only freeze).
+
 ## Tech stack
 
 Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS v4, shadcn-style primitives, Motion 14 for layout transitions, viem 2, zod 3, Solidity 0.8.24 with Foundry, Arbitrum Sepolia, Paxos USDG (MockUSDG on testnet), Vercel.
@@ -67,7 +85,7 @@ Written by `npm run proof`. Each block says plainly when it has not run.
 **Chain read**
 
 <!-- PROOF:BEGIN chain-read -->
-Arbitrum Sepolia (421614) block 332581368 read in 523 ms on 2026-11-25T11:17:42.873Z.
+Arbitrum Sepolia (421614) block 332583922 read in 270 ms on 2026-11-25T11:29:48.942Z.
 
 Not run in this build: NEXT_PUBLIC_CONTRACT_ADDRESS is not configured.
 <!-- PROOF:END chain-read -->
@@ -76,11 +94,11 @@ Not run in this build: NEXT_PUBLIC_CONTRACT_ADDRESS is not configured.
 
 <!-- PROOF:BEGIN forge-test -->
 ```
-Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 106.16ms (107.47ms CPU time)
-Ran 1 test suite in 107.12ms (106.16ms CPU time): 8 tests passed, 0 failed, 0 skipped (8 total tests)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 81.19ms (86.47ms CPU time)
+Ran 1 test suite in 82.36ms (81.19ms CPU time): 12 tests passed, 0 failed, 0 skipped (12 total tests)
 ```
 
-`forge test` in contracts/, exit code 0, 2026-11-25T11:17:43.605Z.
+`forge test` in contracts/, exit code 0, 2026-11-25T11:29:49.695Z.
 <!-- PROOF:END forge-test -->
 
 **Demo state (anchor leases)**
@@ -104,11 +122,14 @@ There is no database: the chain is the store, and `lib/config.ts` says where it 
 
 ## Try the demo
 
-The desk opens on Rua Harmonia 302: Larissa moved out, Otávio listed a cracked window (400) and a repaint (900). Accept the window, dispute the paint, seal 900 for Otávio and 300 for Larissa, open both, and let Camila pick. Settle shows the split. Then open Alameda Santos 1140, where the landlord never listed anything, and claim the full refund.
+The desk opens on Rua Harmonia 302: Larissa moved out, Otávio listed a cracked window (400) and a repaint (900). Accept the window, dispute the paint, seal 900 for Otávio and 300 for Larissa, open both, and let Camila pick. Settle shows the split. Then open Alameda Santos 1140, where the landlord never listed anything, and claim the full refund. Last, on the lease Larissa opened in step 1, start the move-out and list the two deductions live from Otávio's wallet (DEMO step 6).
+
+## Security
+
+See `SECURITY.md` for the contract address, wallet permissions and the exact approval the app asks for. DepositVault measures every deposit it pulls in, emits `Settled` with both parties, and has an owner pause that stops new deposits only: moves, timeouts, settle and withdraw keep working while paused.
 
 ## What we would build next
 
-- A wallet button over viem and the browser wallet, with per-step transaction status.
 - Foundry tests for every timeout path, plus Arbiscan verification.
 - An agency pilot with one São Paulo imobiliária managing 50 live leases from one panel.
 - Pix on-ramp so a tenant can fund the deposit in reais and get USDG locked in one step.
